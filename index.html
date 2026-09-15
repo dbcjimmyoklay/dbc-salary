@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏂</text></svg>">
+<title>DBC 教練薪資試算</title>
+<style>img{max-width:100%}[hidden]{display:none!important}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --surface-2:#eaeef4; --line:#d9dfe8; --line-strong:#b9c3d1;
+  --ink:#16202b; --ink-2:#4b5866; --muted:#7b8794;
+  --accent:#2a6bb0; --accent-ink:#ffffff; --accent-soft:#e3edf8;
+  --ok:#1f8a5b; --ok-soft:#dff3e8; --warn:#b8720f; --warn-soft:#fbeed6; --bad:#c0392b; --bad-soft:#f9e1de;
+  --seg-base:#5b7a99; --seg-lv2:#7fb1e6; --seg-mgr:#c9a24a; --seg-retain:#8bc3a0; --seg-bonus:#2a6bb0;
+  --shadow:0 1px 2px rgba(22,32,43,.06),0 8px 24px -12px rgba(22,32,43,.18);
+  --radius:10px; --font:"IBM Plex Sans","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f151d; --surface:#171f2a; --surface-2:#1f2936; --line:#2b3644; --line-strong:#3c4959;
+    --ink:#e7edf4; --ink-2:#b4bfcc; --muted:#8593a3;
+    --accent:#6ea6e6; --accent-ink:#0f151d; --accent-soft:#1d2f45;
+    --ok:#4cc38a; --ok-soft:#173327; --warn:#e0a23a; --warn-soft:#3a2c12; --bad:#e8705f; --bad-soft:#3d1f1b;
+    --seg-base:#6d8db0; --seg-lv2:#5f98d8; --seg-mgr:#c9a24a; --seg-retain:#5fae7f; --seg-bonus:#6ea6e6;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f151d; --surface:#171f2a; --surface-2:#1f2936; --line:#2b3644; --line-strong:#3c4959;
+  --ink:#e7edf4; --ink-2:#b4bfcc; --muted:#8593a3;
+  --accent:#6ea6e6; --accent-ink:#0f151d; --accent-soft:#1d2f45;
+  --ok:#4cc38a; --ok-soft:#173327; --warn:#e0a23a; --warn-soft:#3a2c12; --bad:#e8705f; --bad-soft:#3d1f1b;
+  --seg-base:#6d8db0; --seg-lv2:#5f98d8; --seg-mgr:#c9a24a; --seg-retain:#5fae7f; --seg-bonus:#6ea6e6;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -12px rgba(0,0,0,.6);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible,.row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{margin:0;text-wrap:balance;line-height:1.25}
+.num{font-variant-numeric:tabular-nums}
+.pos{color:var(--ok)} .neg{color:var(--bad)}
+
+/* header */
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line)}
+.top-inner{max-width:1240px;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{display:flex;flex-direction:column;gap:2px;margin-right:auto}
+.brand h1{font-size:18px;font-weight:700;letter-spacing:.01em}
+.brand .sub{font-size:12px;color:var(--muted);letter-spacing:.04em}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:8px 14px;font-weight:500;font-size:14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.small{padding:6px 10px;font-size:13px}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn[disabled]{opacity:.5;cursor:default}
+
+/* layout */
+.wrap{max-width:1240px;margin:0 auto;padding:20px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 16px}
+.stat .lbl{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.stat .val{font-size:22px;font-weight:600;margin-top:2px}
+.stat .val small{font-size:13px;font-weight:400;color:var(--muted);margin-left:4px}
+.cols{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}
+.roster{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);position:sticky;top:76px;max-height:calc(100vh - 96px);display:flex;flex-direction:column;overflow:hidden}
+.roster-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line)}
+.roster-head h2{font-size:14px;font-weight:600;color:var(--ink-2)}
+.roster-list{overflow:auto;padding:6px}
+.row{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;border:0;background:transparent;width:100%;text-align:left}
+.row:hover{background:var(--surface-2)}
+.row.active{background:var(--accent-soft)}
+.row .idx{font-size:12px;color:var(--muted);text-align:right}
+.row .nm{font-weight:500;display:flex;flex-direction:column;line-height:1.2}
+.row .nm small{font-size:11px;color:var(--muted);font-weight:400;margin-top:2px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.zero{background:var(--surface-2);color:var(--muted)}
+.mobile-nav{display:none;gap:8px;margin-bottom:14px}
+.mobile-nav select{flex:1;padding:10px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface)}
+
+/* detail */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.panel-head{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.who{display:flex;flex-direction:column;gap:4px;margin-right:auto;min-width:0}
+.who h2{font-size:22px;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.who .note{font-size:13px;color:var(--muted)}
+.who input.name{font-size:22px;font-weight:700;border:0;border-bottom:1px dashed transparent;background:transparent;padding:0;max-width:200px;min-width:60px}
+.who input.name:hover,.who input.name:focus{border-bottom-color:var(--line-strong)}
+.who input.note{border:0;background:transparent;padding:0;font-size:13px;color:var(--muted);width:100%;max-width:360px}
+.chip{font-size:12px;padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--ink-2);font-weight:500}
+.chip select{border:0;background:transparent;font-size:12px;font-weight:500;padding:0}
+.fixed{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--muted)}
+.field input{padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);width:100%;text-align:right}
+.field .hint{font-size:11px;color:var(--muted)}
+.section{padding:18px 20px;border-bottom:1px solid var(--line)}
+.section:last-child{border-bottom:0}
+.section-title{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.section-title h3{font-size:15px;font-weight:600}
+.section-title .eq{font-size:13px;color:var(--muted)}
+.bar{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--surface-2);margin-bottom:10px}
+.bar span{display:block;height:100%;min-width:0}
+.legend{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.legend .it{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);font-size:12px;color:var(--muted)}
+.legend .it b{font-size:15px;color:var(--ink);font-weight:600}
+.legend .it i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;font-style:normal}
+.legend .it.total{border-color:var(--accent);background:var(--accent-soft)}
+
+.months{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.mcard{border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+.mcard-head{padding:10px 12px;background:var(--surface-2);display:flex;justify-content:space-between;align-items:baseline}
+.mcard-head b{font-size:15px}
+.mcard-head span{font-size:12px;color:var(--muted)}
+.mrow{display:grid;grid-template-columns:1fr 96px;gap:8px;align-items:center;padding:8px 12px;border-top:1px solid var(--line)}
+.mrow .t{display:flex;flex-direction:column;line-height:1.2}
+.mrow .t small{font-size:11px;color:var(--muted);margin-top:2px}
+.stepper{display:flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;background:var(--surface)}
+.stepper button{width:26px;border:0;background:var(--surface-2);font-size:16px;line-height:1;padding:0;color:var(--ink-2)}
+.stepper button:hover{background:var(--line)}
+.stepper input{width:44px;border:0;text-align:center;padding:6px 0;background:transparent;-moz-appearance:textfield}
+.stepper input::-webkit-inner-spin-button,.stepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.msub{padding:2px 12px 8px;font-size:12px;color:var(--muted);text-align:right}
+.mfoot{margin-top:auto;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface-2);display:grid;gap:4px;font-size:13px}
+.mfoot div{display:flex;justify-content:space-between;align-items:center}
+.mfoot .k{color:var(--muted)}
+.mfoot .big{font-size:16px;font-weight:600}
+
+.total{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:stretch}
+.ledger{border:1px solid var(--line);border-radius:var(--radius);padding:4px 14px}
+.ledger div{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.ledger div:last-child{border-bottom:0}
+.ledger .k{color:var(--ink-2)}
+.ledger .sum{font-weight:700;font-size:16px}
+.verdict{border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;justify-content:center;gap:6px;border:1px solid var(--line)}
+.verdict.ok{background:var(--ok-soft);border-color:var(--ok)} .verdict.bad{background:var(--bad-soft);border-color:var(--bad)} .verdict.warn{background:var(--warn-soft);border-color:var(--warn)}
+.verdict .lbl{font-size:12px;letter-spacing:.06em;color:var(--ink-2)}
+.verdict .big{font-size:30px;font-weight:700;line-height:1.1}
+.verdict .cmp{font-size:13px;color:var(--ink-2)}
+.verdict.ok .big{color:var(--ok)} .verdict.bad .big{color:var(--bad)} .verdict.warn .big{color:var(--warn)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+
+/* dialog */
+dialog{border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:0;max-width:520px;width:calc(100% - 32px);box-shadow:var(--shadow)}
+dialog::backdrop{background:rgba(10,14,20,.5)}
+.dlg-head{padding:16px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.dlg-head h2{font-size:16px}
+.dlg-body{padding:16px 20px;display:grid;gap:14px}
+.dlg-body .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dlg-foot{padding:12px 20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.radio{display:flex;flex-direction:column;gap:8px}
+.radio label{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.radio label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.radio b{display:block;font-size:14px}
+.radio small{color:var(--muted);font-size:12px;line-height:1.4}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.help{font-size:12px;color:var(--muted);line-height:1.5}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+
+@media (max-width:1000px){
+  .cols{grid-template-columns:1fr}
+  .roster{display:none}
+  .mobile-nav{display:flex}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .months{grid-template-columns:repeat(2,1fr)}
+  .legend{grid-template-columns:repeat(3,1fr)}
+}
+@media (max-width:600px){
+  .wrap{padding:14px}
+  .top-inner{padding:10px 14px}
+  .months{grid-template-columns:1fr}
+  .fixed{grid-template-columns:1fr 1fr}
+  .total{grid-template-columns:1fr}
+  .legend{grid-template-columns:repeat(2,1fr)}
+  .stat .val{font-size:18px}
+  .actions .btn{padding:8px 10px;font-size:13px}
+  .panel-head,.section,.fixed{padding-left:14px;padding-right:14px}
+}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <h1>DBC 教練薪資試算</h1>
+      <div class="sub">雪季四個月 · 12月 – 3月 · 每月獎金依實際紀錄浮動</div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="simAll">全員隨機模擬</button>
+      <button class="btn" id="copyAll">複製全員結果</button>
+      <button class="btn" id="openSettings">設定</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="stats" id="stats"></div>
+  <div class="mobile-nav">
+    <button class="btn" id="prevP" aria-label="上一位">‹</button>
+    <select id="pickP" aria-label="選擇人員"></select>
+    <button class="btn" id="nextP" aria-label="下一位">›</button>
+  </div>
+  <div class="cols">
+    <aside class="roster">
+      <div class="roster-head"><h2>教練名單</h2><button class="btn small" id="addP">＋ 新增</button></div>
+      <div class="roster-list" id="roster"></div>
+    </aside>
+    <section id="detail"></section>
+  </div>
+</main>
+
+<dialog id="settings">
+  <div class="dlg-head"><h2>試算設定</h2><button class="btn small" id="closeSettings">關閉</button></div>
+  <div class="dlg-body">
+    <div class="grid">
+      <div class="field"><label>每月底薪</label><input type="number" id="s_base" inputmode="numeric"></div>
+      <div class="field"><label>協助接客 · 每次</label><input type="number" id="s_guest" inputmode="numeric"></div>
+      <div class="field"><label>好評 · 每則</label><input type="number" id="s_review" inputmode="numeric"></div>
+      <div class="field"><label>指名 · 每次</label><input type="number" id="s_nominate" inputmode="numeric"></div>
+      <div class="field"><label>新人輔導 · 每次</label><input type="number" id="s_mentor" inputmode="numeric"></div>
+      <div class="field"><label>模擬時每月差額容許 ±</label><input type="number" id="s_tol" inputmode="numeric"><span class="hint">隨機模擬時，每個月「實領 − 應領」都會落在這個範圍內</span></div>
+    </div>
+    <div>
+      <div class="field"><label>實領總薪水的計算方式</label></div>
+      <div class="radio">
+        <label><input type="radio" name="mode" value="season"><span><b>四個月實領 ＋ 季發一次性加給（建議）</b><small>實領總薪水 ＝ 四個月實領合計（含底薪）＋ lv2加給 ＋ 主管加給 ＋ 留任加給。四個月的獎金總和剛好等於「每月獎金 × 4」時，實領 ＝ 應領。</small></span></label>
+        <label><input type="radio" name="mode" value="sheet"><span><b>依原試算表公式</b><small>實領總薪水 ＝ 四個月實領合計（含底薪）＋ 總實領底薪 118,000。底薪會被計算兩次，季發加給不計入。</small></span></label>
+      </div>
+    </div>
+    <p class="help">所有資料只存在這台裝置的瀏覽器裡，換裝置或清除瀏覽資料後會回到預設值。</p>
+  </div>
+  <div class="dlg-foot">
+    <button class="btn danger" id="resetAll">還原成試算表原始資料</button>
+    <button class="btn primary" id="saveSettings">儲存</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const MONTHS=['12月','1月','2月','3月'];
+const TYPES=[
+  {k:'guest',label:'協助接客',unit:'次'},
+  {k:'review',label:'好評',unit:'則'},
+  {k:'nominate',label:'指名',unit:'次'},
+  {k:'mentor',label:'新人輔導',unit:'次'}
+];
+const DEFAULT_SETTINGS={base:29500,rates:{guest:2000,review:1500,nominate:5000,mentor:3000},mode:'season',tol:5000};
+const Z=()=>[0,0,0,0];
+function P(id,rank,name,salary,allowance,note,manager,retain,counts){
+  return {id,rank,name,salary,allowance,note,manager,retain,counts:counts||{guest:Z(),review:Z(),nominate:Z(),mentor:Z()}};
+}
+const DEFAULT_PEOPLE=[
+  P(1,'資深教練','許佩芸',110000,10000,'單板lv2 / 雙板lv2',0,80000,{guest:[9,10,13,9],review:[6,5,6,5],nominate:[3,5,5,5],mentor:[2,3,4,4]}),
+  P(2,'資深教練','洪琦雅',110000,10000,'單板lv2 / 雙板lv2',0,80000,{guest:[10,13,10,10],review:[9,6,2,3],nominate:[4,2,1,3],mentor:[6,4,6,4]}),
+  P(3,'資深教練','李玉鈞',90000,5000,'單板lv2',80000,80000,{guest:[10,12,9,8],review:[9,3,2,2],nominate:[1,2,2,3],mentor:[2,2,3,4]}),
+  P(4,'資深教練','林凡',90000,5000,'單板lv2',80000,80000,{guest:[11,12,9,9],review:[8,5,1,1],nominate:[5,3,2,1],mentor:[3,2,2,4]}),
+  P(5,'資深教練','郭融融',80000,0,'',0,80000,{guest:[9,10,10,10],review:[4,5,3,4],nominate:[2,2,3,1],mentor:[3,1,2,2]}),
+  P(6,'合約教練','孫楷程',70000,5000,'單板lv2',0,40000),
+  P(7,'合約教練','邱德育',70000,5000,'單板lv2',0,40000),
+  P(8,'合約教練','江婉瑜',70000,0,'',0,40000),
+  P(9,'合約教練','陳姿蓉',70000,0,'',0,40000),
+  P(10,'合約教練','王莉如',70000,0,'',0,40000),
+  P(11,'合約教練','林彥君',70000,0,'',0,40000),
+  P(12,'合約教練','莊謹瑄',70000,0,'',0,40000),
+  P(13,'合約教練','方培燊',70000,0,'',0,40000),
+  P(14,'合約教練','翁嫚鍶',70000,0,'',0,40000),
+  P(15,'合約教練','賴咸融',70000,0,'',0,40000),
+  P(16,'合約教練','陳彥如',70000,0,'',0,40000),
+  P(17,'合約教練','吳哲瑋',70000,0,'',0,40000),
+  P(18,'合約教練','羅元甫',70000,0,'',0,40000),
+  P(19,'合約教練','蔡長庭',70000,0,'',0,40000),
+  P(20,'合約教練','張恩齊',70000,0,'',0,40000),
+  P(21,'合約教練','吳承蔚',70000,0,'',0,40000),
+  P(22,'合約教練','林冠辰',70000,0,'',0,40000)
+];
+const RANKS=['資深教練','合約教練','主管','其他'];
+const KEY='dbc-salary-v1';
+
+let state=load();
+function load(){
+  try{
+    const raw=localStorage.getItem(KEY);
+    if(raw){const s=JSON.parse(raw); if(s&&s.people&&s.settings){ if(s.settings.tol==null)s.settings.tol=5000; return s;}}
+  }catch(e){}
+  return fresh();
+}
+function fresh(){return {settings:JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),people:JSON.parse(JSON.stringify(DEFAULT_PEOPLE)),sel:1};}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+
+/* ---------- 計算（對應試算表各欄） ---------- */
+function calc(p,s){
+  const n=MONTHS.length;
+  const monthly=(+p.salary||0)+(+p.allowance||0);          // F 月薪
+  const expected=monthly*n;                                 // H 應領總薪水
+  const baseTotal=s.base*n;                                 // I 總底薪
+  const lv2=(+p.allowance||0)*n;                            // K lv2加給(總)
+  const manager=+p.manager||0, retain=+p.retain||0;         // L, M
+  const oneTime=lv2+manager+retain;                         // 季發一次性
+  const N=(expected-baseTotal-oneTime)/n;                   // N 每月獎金
+  const AZ=N+s.base;                                        // AZ 每月應領
+  const months=MONTHS.map((_,i)=>{
+    const subs={}; let v=0;
+    for(const t of TYPES){subs[t.k]=(+p.counts[t.k][i]||0)*s.rates[t.k]; v+=subs[t.k];}
+    const actual=s.base+v;
+    return {subs,variable:v,actual,diff:actual-AZ};
+  });
+  const sumVar=months.reduce((a,m)=>a+m.variable,0);
+  const sumActual=months.reduce((a,m)=>a+m.actual,0);       // BI
+  const totalActual=s.mode==='sheet'?sumActual+baseTotal:sumActual+oneTime;   // BK
+  const targetVar=s.mode==='sheet'?expected-2*baseTotal:expected-baseTotal-oneTime;
+  return {monthly,expected,baseTotal,lv2,manager,retain,oneTime,N,AZ,months,sumVar,sumActual,totalActual,gap:totalActual-expected,targetVar};
+}
+
+/* ---------- 隨機模擬：讓四個月獎金總和剛好等於目標 ---------- */
+const g=Math.gcd||function(a,b){while(b){[a,b]=[b,a%b];}return a;};
+function gcdAll(arr){return arr.reduce((a,b)=>g(a,b));}
+function rnd(a,b){return a+Math.floor(Math.random()*(b-a+1));}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+function egcd(a,b){if(b===0)return[a,1,0];const[gg,x,y]=egcd(b,a%b);return[gg,y,x-Math.floor(a/b)*y];}
+// 用「好評」與「協助接客」的次數微調某一個月的殘差，讓當月獎金剛好等於目標
+function fixMonth(counts,i,residual,s){
+  if(residual===0) return true;
+  const r1=s.rates.review, r2=s.rates.guest, G=g(r1,r2);
+  if(residual%G!==0) return false;
+  const d=residual/G, u=r1/G, v=r2/G;
+  const [,x0,y0]=egcd(u,v);
+  let best=null; const K=Math.abs(d)+8;
+  for(let k=-K;k<=K;k++){
+    const a=x0*d+v*k, b=y0*d-u*k;
+    if(counts.review[i]+a<0||counts.guest[i]+b<0) continue;
+    const cost=Math.abs(a)+Math.abs(b);
+    if(!best||cost<best.cost) best={a,b,cost};
+  }
+  if(!best) return false;
+  counts.review[i]+=best.a; counts.guest[i]+=best.b;
+  return true;
+}
+// 隨機產生四個月的次數：總和剛好等於目標，且每個月的差額都在 ±tol 內
+function randomCounts(target,s){
+  const n=MONTHS.length, G=g(s.rates.review,s.rates.guest);
+  const tol=Math.max(0,+s.tol||0);
+  const N=target/n;
+  // 每月基準（G 的倍數），把餘數分給隨機幾個月
+  const q=Math.floor(N/G)*G;
+  const tgt=MONTHS.map(()=>q);
+  let rem=target-q*n;
+  for(const i of shuffle([0,1,2,3])){if(rem>=G){tgt[i]+=G;rem-=G;}}
+  if(rem!==0) return null;
+  // 每月上下浮動（G 的倍數），四個月加總為 0
+  const span=Math.max(0,Math.floor((tol-G)/G));
+  if(span>0){
+    for(let t=0;t<50;t++){
+      const o=[0,1,2].map(()=>rnd(-span,span)*G);
+      const last=-(o[0]+o[1]+o[2]);
+      if(Math.abs(last)<=span*G){o.push(last);shuffle(o);o.forEach((x,i)=>tgt[i]+=x);break;}
+    }
+  }
+  if(tgt.some(x=>x<0)) return null;
+  const counts={guest:Z(),review:Z(),nominate:Z(),mentor:Z()};
+  const baseP=[0.36,0.14,0.34,0.16];
+  for(let i=0;i<n;i++){
+    let props=baseP.map(x=>Math.max(0.03,x+(Math.random()-0.5)*0.16));
+    const ps=props.reduce((a,b)=>a+b,0); props=props.map(x=>x/ps);
+    let got=0;
+    TYPES.forEach((t,ti)=>{const c=Math.max(0,Math.round(props[ti]*tgt[i]/s.rates[t.k]));counts[t.k][i]=c;got+=c*s.rates[t.k];});
+    if(!fixMonth(counts,i,tgt[i]-got,s)) return null;
+  }
+  return counts;
+}
+function simulate(p,s){
+  const target=calc(p,s).targetVar;
+  if(target<=0){for(const t of TYPES)p.counts[t.k]=Z(); return target===0;}
+  for(let i=0;i<300;i++){const c=randomCounts(target,s); if(c){p.counts=c; return true;}}
+  return false;
+}
+// 自動補齊：逐月只調整好評與接客次數，讓每個月的獎金剛好等於每月獎金
+function balance(p,s){
+  const c=calc(p,s);
+  const copy={guest:p.counts.guest.slice(),review:p.counts.review.slice(),nominate:p.counts.nominate.slice(),mentor:p.counts.mentor.slice()};
+  const n=MONTHS.length, G=g(s.rates.review,s.rates.guest);
+  const N=c.targetVar/n, q=Math.floor(N/G)*G;
+  const tgt=MONTHS.map(()=>q); let rem=c.targetVar-q*n;
+  for(let i=0;i<n&&rem>=G;i++){tgt[i]+=G;rem-=G;}
+  if(rem!==0) return false;
+  for(let i=0;i<n;i++){
+    let residual=tgt[i]-c.months[i].variable;
+    // 先嘗試只動好評與接客；若當月已超額太多，再逐次減少指名、新人輔導後重試
+    let guard=0;
+    while(!fixMonth(copy,i,residual,s)){
+      if(residual>=0||guard++>200) return false;
+      if(copy.nominate[i]>0){copy.nominate[i]--;residual+=s.rates.nominate;}
+      else if(copy.mentor[i]>0){copy.mentor[i]--;residual+=s.rates.mentor;}
+      else return false;
+    }
+  }
+  p.counts=copy; return true;
+}
+
+/* ---------- 畫面 ---------- */
+const $=(sel,el=document)=>el.querySelector(sel);
+const fmt=n=>Math.round(n).toLocaleString('zh-TW');
+const sgn=n=>(n>0?'+':n<0?'−':'±')+fmt(Math.abs(n));
+function person(){return state.people.find(p=>p.id===state.sel)||state.people[0];}
+function gapPill(gap,cls){
+  if(gap===0) return `<span class="pill ok ${cls||''}">達標</span>`;
+  return `<span class="pill ${gap>0?'warn':'bad'} ${cls||''}">${sgn(gap)}</span>`;
+}
+
+function renderAll(){renderStats();renderRoster();renderDetail();save();}
+
+function renderStats(){
+  const s=state.settings; let exp=0,act=0,ok=0;
+  for(const p of state.people){const c=calc(p,s);exp+=c.expected;act+=c.totalActual;if(c.gap===0)ok++;}
+  $('#stats').innerHTML=`
+    <div class="stat"><div class="lbl">教練人數</div><div class="val">${state.people.length}<small>位</small></div></div>
+    <div class="stat"><div class="lbl">全員應領總薪水</div><div class="val">${fmt(exp)}</div></div>
+    <div class="stat"><div class="lbl">全員實領總薪水</div><div class="val">${fmt(act)}<small class="${act-exp===0?'pos':act-exp>0?'':'neg'}">${act-exp===0?'相符':sgn(act-exp)}</small></div></div>
+    <div class="stat"><div class="lbl">實領＝應領</div><div class="val">${ok}<small>／ ${state.people.length} 位</small></div></div>`;
+}
+function renderRoster(){
+  const s=state.settings;
+  $('#roster').innerHTML=state.people.map((p,i)=>{
+    const c=calc(p,s);
+    return `<button class="row ${p.id===state.sel?'active':''}" data-id="${p.id}">
+      <span class="idx">${i+1}</span>
+      <span class="nm">${esc(p.name)}<small>${esc(p.rank)} · 應領 ${fmt(c.expected)}</small></span>
+      ${gapPill(c.gap)}</button>`;
+  }).join('');
+  const pick=$('#pickP');
+  pick.innerHTML=state.people.map((p,i)=>{const c=calc(p,s);return `<option value="${p.id}" ${p.id===state.sel?'selected':''}>${i+1}. ${esc(p.name)} · ${esc(p.rank)} · ${c.gap===0?'達標':sgn(c.gap)}</option>`;}).join('');
+}
+function esc(s){return String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}
+
+function renderDetail(){
+  const p=person(); const s=state.settings; const el=$('#detail');
+  if(!p){el.innerHTML='<div class="panel"><div class="empty">尚無人員，請先新增。</div></div>';return;}
+  const c=calc(p,s);
+  const n=MONTHS.length;
+  const segs=[
+    ['seg-base','底薪 × '+n,c.baseTotal],['seg-lv2','lv2加給',c.lv2],['seg-mgr','主管加給',c.manager],['seg-retain','留任加給',c.retain],['seg-bonus','每月獎金 × '+n,c.N*n]
+  ];
+  const bar=segs.map(([cl,,v])=>`<span style="flex:${Math.max(0,v)};background:var(--${cl})" title="${fmt(v)}"></span>`).join('');
+  const legend=segs.map(([cl,l,v])=>`<div class="it"><span><i style="background:var(--${cl})"></i>${l}</span><b>${fmt(v)}</b></div>`).join('');
+  const monthCards=MONTHS.map((m,i)=>{
+    const mc=c.months[i];
+    const rows=TYPES.map(t=>`
+      <div class="mrow">
+        <div class="t">${t.label}<small>每${t.unit} ${fmt(s.rates[t.k])}</small></div>
+        <div class="stepper">
+          <button type="button" data-step="-1" data-k="${t.k}" data-i="${i}" aria-label="減少">−</button>
+          <input type="number" min="0" inputmode="numeric" value="${p.counts[t.k][i]||0}" data-k="${t.k}" data-i="${i}" aria-label="${m} ${t.label} 次數">
+          <button type="button" data-step="1" data-k="${t.k}" data-i="${i}" aria-label="增加">＋</button>
+        </div>
+      </div>
+      <div class="msub" data-sub="${t.k}-${i}">小計 ${fmt(mc.subs[t.k])}</div>`).join('');
+    return `<div class="mcard">
+      <div class="mcard-head"><b>${m}</b><span>底薪 ${fmt(s.base)}</span></div>
+      ${rows}
+      <div class="mfoot">
+        <div><span class="k">當月獎金</span><span data-mvar="${i}">${fmt(mc.variable)}</span></div>
+        <div><span class="k">當月實領</span><span class="big" data-mact="${i}">${fmt(mc.actual)}</span></div>
+        <div><span class="k">每月應領</span><span data-maz>${fmt(c.AZ)}</span></div>
+        <div><span class="k">差額</span><span data-mdiff="${i}">${gapPill(mc.diff)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+  el.innerHTML=`<div class="panel">
+    <div class="panel-head">
+      <div class="who">
+        <h2><input class="name" value="${esc(p.name)}" data-f="name" aria-label="姓名"><span class="chip"><select data-f="rank" aria-label="階級">${RANKS.map(r=>`<option ${r===p.rank?'selected':''}>${r}</option>`).join('')}</select></span></h2>
+        <input class="note" value="${esc(p.note)}" placeholder="備註（例如：單板lv2）" data-f="note" aria-label="備註">
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="simOne">隨機模擬此人</button>
+        <button class="btn" id="balOne" title="只調整好評與協助接客的次數，讓實領剛好等於應領">自動補齊差額</button>
+        <button class="btn" id="clearOne">清空紀錄</button>
+        <button class="btn danger small" id="delOne">刪除</button>
+      </div>
+    </div>
+    <div class="fixed">
+      <div class="field"><label>薪水（每月）</label><input type="number" inputmode="numeric" value="${p.salary}" data-f="salary"></div>
+      <div class="field"><label>加給（每月）</label><input type="number" inputmode="numeric" value="${p.allowance}" data-f="allowance"><span class="hint">lv2加給(總) ＝ 加給 × ${n}</span></div>
+      <div class="field"><label>主管加給（總）</label><input type="number" inputmode="numeric" value="${p.manager}" data-f="manager"></div>
+      <div class="field"><label>留任加給（總）</label><input type="number" inputmode="numeric" value="${p.retain}" data-f="retain"></div>
+    </div>
+    <div class="section">
+      <div class="section-title"><h3>應領總薪水的組成</h3><span class="eq">月薪 ${fmt(c.monthly)} × ${n} 個月 ＝ <b>${fmt(c.expected)}</b>　每月獎金 ＝ ${fmt(c.N)}　每月應領 ＝ ${fmt(c.AZ)}</span></div>
+      <div class="bar">${bar}</div>
+      <div class="legend">${legend}</div>
+    </div>
+    <div class="section">
+      <div class="section-title"><h3>每月實際紀錄</h3><span class="eq">手動紀錄欄位 · 四個月獎金總和需達 <b data-target>${fmt(c.targetVar)}</b>，模擬時每月差額控制在 ±${fmt(s.tol)}</span></div>
+      <div class="months">${monthCards}</div>
+    </div>
+    <div class="section">
+      <div class="section-title"><h3>總計算</h3></div>
+      <div class="total">
+        <div class="ledger">
+          <div><span class="k">四個月實領合計（含底薪）</span><span data-sumact>${fmt(c.sumActual)}</span></div>
+          ${s.mode==='sheet'
+            ?`<div><span class="k">總實領底薪</span><span>${fmt(c.baseTotal)}</span></div>`
+            :`<div><span class="k">季發一次性加給（lv2＋主管＋留任）</span><span>${fmt(c.oneTime)}</span></div>`}
+          <div><span class="k sum">實領總薪水</span><span class="sum" data-totact>${fmt(c.totalActual)}</span></div>
+          <div><span class="k sum">應領總薪水</span><span class="sum">${fmt(c.expected)}</span></div>
+        </div>
+        <div class="verdict ${c.gap===0?'ok':c.gap>0?'warn':'bad'}" data-verdict>
+          <div class="lbl">實領 − 應領</div>
+          <div class="big">${c.gap===0?'剛好相符':sgn(c.gap)}</div>
+          <div class="cmp">${c.gap===0?'四個月獎金總和剛好等於每月獎金 × '+n:c.gap>0?'多發了 '+fmt(c.gap)+'，可減少紀錄次數':'還差 '+fmt(-c.gap)+'，按「自動補齊差額」可補足'}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  bindDetail(el,p);
+}
+function refreshNumbers(){
+  const p=person(); const s=state.settings; const c=calc(p,s); const el=$('#detail');
+  MONTHS.forEach((_,i)=>{
+    const mc=c.months[i];
+    for(const t of TYPES){const q=el.querySelector(`[data-sub="${t.k}-${i}"]`); if(q)q.textContent='小計 '+fmt(mc.subs[t.k]);}
+    el.querySelector(`[data-mvar="${i}"]`).textContent=fmt(mc.variable);
+    el.querySelector(`[data-mact="${i}"]`).textContent=fmt(mc.actual);
+    el.querySelector(`[data-mdiff="${i}"]`).innerHTML=gapPill(mc.diff);
+  });
+  el.querySelector('[data-sumact]').textContent=fmt(c.sumActual);
+  el.querySelector('[data-totact]').textContent=fmt(c.totalActual);
+  const v=el.querySelector('[data-verdict]');
+  v.className='verdict '+(c.gap===0?'ok':c.gap>0?'warn':'bad');
+  v.querySelector('.big').textContent=c.gap===0?'剛好相符':sgn(c.gap);
+  v.querySelector('.cmp').textContent=c.gap===0?'四個月獎金總和剛好等於每月獎金 × '+MONTHS.length:c.gap>0?'多發了 '+fmt(c.gap)+'，可減少紀錄次數':'還差 '+fmt(-c.gap)+'，按「自動補齊差額」可補足';
+  renderStats();renderRoster();save();
+}
+function bindDetail(el,p){
+  el.querySelectorAll('input[data-k]').forEach(inp=>{
+    inp.addEventListener('input',()=>{const v=Math.max(0,parseInt(inp.value,10)||0);p.counts[inp.dataset.k][+inp.dataset.i]=v;refreshNumbers();});
+  });
+  el.querySelectorAll('button[data-step]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const k=b.dataset.k,i=+b.dataset.i;
+      p.counts[k][i]=Math.max(0,(p.counts[k][i]||0)+ +b.dataset.step);
+      el.querySelector(`input[data-k="${k}"][data-i="${i}"]`).value=p.counts[k][i];
+      refreshNumbers();
+    });
+  });
+  el.querySelectorAll('[data-f]').forEach(inp=>{
+    const ev=inp.tagName==='SELECT'?'change':'change';
+    inp.addEventListener(ev,()=>{
+      const f=inp.dataset.f;
+      if(['salary','allowance','manager','retain'].includes(f)) p[f]=Math.max(0,parseInt(inp.value,10)||0);
+      else p[f]=inp.value.trim()||(f==='name'?'未命名':'');
+      renderAll();
+    });
+  });
+  $('#simOne').onclick=()=>{if(simulate(p,state.settings)){renderAll();toast(`${p.name} 已隨機模擬，實領＝應領，每月差額在 ±${fmt(state.settings.tol)} 內`);}else{renderAll();toast('無法用目前單價湊出剛好的金額，請調整設定');}};
+  $('#balOne').onclick=()=>{if(balance(p,state.settings)){renderAll();toast('已補齊，每月實領＝每月應領');}else toast('無法補齊，請檢查單價設定或先調整次數');};
+  $('#clearOne').onclick=()=>{for(const t of TYPES)p.counts[t.k]=Z();renderAll();};
+  $('#delOne').onclick=()=>{
+    if(!armed($('#delOne'),'確定刪除？'))return;
+    const i=state.people.findIndex(x=>x.id===p.id);
+    state.people.splice(i,1);
+    state.sel=state.people.length?state.people[Math.min(i,state.people.length-1)].id:0;
+    renderAll();
+  };
+}
+
+/* ---------- 全域按鈕 ---------- */
+$('#roster').addEventListener('click',e=>{const b=e.target.closest('.row');if(!b)return;state.sel=+b.dataset.id;renderAll();});
+$('#pickP').addEventListener('change',e=>{state.sel=+e.target.value;renderAll();});
+$('#prevP').onclick=()=>{const i=state.people.findIndex(p=>p.id===state.sel);if(i>0){state.sel=state.people[i-1].id;renderAll();}};
+$('#nextP').onclick=()=>{const i=state.people.findIndex(p=>p.id===state.sel);if(i<state.people.length-1){state.sel=state.people[i+1].id;renderAll();}};
+$('#addP').onclick=()=>{
+  const id=Math.max(0,...state.people.map(p=>p.id))+1;
+  state.people.push(P(id,'合約教練','新教練',70000,0,'',0,40000));
+  state.sel=id;renderAll();
+  setTimeout(()=>{const n=$('#detail input.name');if(n){n.focus();n.select();}},0);
+};
+$('#simAll').onclick=()=>{
+  let fail=0;for(const p of state.people)if(!simulate(p,state.settings))fail++;
+  renderAll();
+  toast(fail?`已模擬，其中 ${fail} 位無法湊出剛好金額`:`全員 ${state.people.length} 位皆已隨機模擬，實領＝應領，每月差額在 ±${fmt(state.settings.tol)} 內`);
+};
+$('#copyAll').onclick=async()=>{
+  const s=state.settings;
+  const head=['編號','階級','人員','薪水','加給','月薪','備註','應領總薪水','總底薪','lv2加給(總)','主管加給(總)','留任加給(總)','每月獎金','每月應領'];
+  for(const t of TYPES) for(const m of MONTHS) head.push(`${t.label} ${m}`);
+  for(const m of MONTHS){head.push(`${m}實領`);head.push(`${m} +/-`);}
+  head.push('四個月實領合計',s.mode==='sheet'?'總實領底薪':'季發一次性加給','實領總薪水','應領總薪水','差額');
+  const lines=[head.join('\t')];
+  state.people.forEach((p,i)=>{
+    const c=calc(p,s);
+    const r=[i+1,p.rank,p.name,p.salary,p.allowance,c.monthly,p.note,c.expected,c.baseTotal,c.lv2,c.manager,c.retain,c.N,c.AZ];
+    for(const t of TYPES) for(let m=0;m<MONTHS.length;m++) r.push(p.counts[t.k][m]||0);
+    c.months.forEach(m=>{r.push(m.actual);r.push(m.diff);});
+    r.push(c.sumActual,s.mode==='sheet'?c.baseTotal:c.oneTime,c.totalActual,c.expected,c.gap);
+    lines.push(r.join('\t'));
+  });
+  const text=lines.join('\n');
+  try{await navigator.clipboard.writeText(text);toast('已複製，可直接貼到 Google 試算表');}
+  catch(e){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('已複製，可直接貼到 Google 試算表');}catch(_){toast('瀏覽器不允許複製');}ta.remove();}
+};
+
+/* ---------- 設定 ---------- */
+const dlg=$('#settings');
+$('#openSettings').onclick=()=>{
+  const s=state.settings;
+  $('#s_base').value=s.base;$('#s_guest').value=s.rates.guest;$('#s_review').value=s.rates.review;$('#s_nominate').value=s.rates.nominate;$('#s_mentor').value=s.rates.mentor;$('#s_tol').value=s.tol;
+  dlg.querySelector(`input[name=mode][value=${s.mode}]`).checked=true;
+  dlg.showModal();
+};
+$('#closeSettings').onclick=()=>dlg.close();
+$('#saveSettings').onclick=()=>{
+  const s=state.settings;
+  s.base=Math.max(0,parseInt($('#s_base').value,10)||0);
+  s.rates.guest=Math.max(1,parseInt($('#s_guest').value,10)||1);
+  s.rates.review=Math.max(1,parseInt($('#s_review').value,10)||1);
+  s.rates.nominate=Math.max(1,parseInt($('#s_nominate').value,10)||1);
+  s.rates.mentor=Math.max(1,parseInt($('#s_mentor').value,10)||1);
+  s.tol=Math.max(0,parseInt($('#s_tol').value,10)||0);
+  s.mode=dlg.querySelector('input[name=mode]:checked').value;
+  dlg.close();renderAll();toast('設定已儲存');
+};
+$('#resetAll').onclick=()=>{if(!armed($('#resetAll'),'確定還原？目前紀錄會清除'))return;state=fresh();dlg.close();renderAll();toast('已還原');};
+
+// 兩段式確認：第一次按下變成確認文字，3 秒內再按一次才執行
+function armed(btn,label){
+  if(btn.dataset.armed){clearTimeout(+btn.dataset.armed);delete btn.dataset.armed;btn.textContent=btn.dataset.orig;return true;}
+  btn.dataset.orig=btn.textContent;btn.textContent=label;
+  btn.dataset.armed=String(setTimeout(()=>{btn.textContent=btn.dataset.orig;delete btn.dataset.armed;},3000));
+  return false;
+}
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);}
+
+renderAll();
+</script>
+
+</body>
+</html>
