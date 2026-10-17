@@ -269,9 +269,9 @@ const ITEMS=[
 const ITEM=Object.fromEntries(ITEMS.map(t=>[t.k,t]));
 const eligible=(t,p)=>!t.elig||t.elig(p);
 const DEFAULT_SETTINGS={base:29500,mode:'season',tol:5000,
-  rates:{review:1500,nominate:1500,manager:5000,snow:5000,ski:5000,mentor:5000,noComplaint:12500,resort:12500}};
+  rates:{review:1000,nominate:1500,manager:5000,snow:5000,ski:5000,mentor:5000,noComplaint:15000,resort:10000}};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
-const RULES_VER=3;
+const RULES_VER=4;
 const Z=()=>[0,0,0,0], ONE=()=>[1,1,1,1];
 function P(id,rank,name,salary,allowance,note,retain,flags,counts){
   const c={}; for(const t of ITEMS) c[t.k]=Z();
@@ -408,8 +408,10 @@ function simulate(p,s){
 // 自動補齊：達成項目全部達成，好評與指名平均分配到四個月，讓總差額盡量為 0
 function balance(p,s){
   const pl=plan(p,s,false); if(!pl) return false;
-  const c=fill(p,s,pl,false); if(!c) return false;
-  p.counts=c; return true;
+  const c=fill(p,s,pl,false);
+  if(c){p.counts=c; return true;}
+  // 平均分配湊不出來時（例如某月只剩 500），改用不同的月份分配再試
+  return simulate(p,s);
 }
 // 單價造成無法剛好相符時，最接近的差額（0 表示可以剛好）
 function minGap(p,s){
@@ -432,7 +434,7 @@ function gapPill(gap,near){
   if(near) return `<span class="pill near">最接近 ${sgn(gap)}</span>`;
   return `<span class="pill ${gap>0?'warn':'bad'}">${sgn(gap)}</span>`;
 }
-const verdictText=(c,p)=>{const m=p?minGap(p,state.settings):0; if(c.gap!==0&&m&&Math.abs(c.gap)===m) return '好評與指名每次 '+fmt(state.settings.rates.review)+'，達成項目全部達成時，這已是最接近的結果'; return c.gap===0?'四個月獎金總和剛好等於每月獎金 × '+MONTHS.length:c.gap>0?'多發了 '+fmt(c.gap)+'，可減少紀錄次數':'還差 '+fmt(-c.gap)+'，按「自動補齊差額」可補足';};
+const verdictText=(c,p)=>{const m=p?minGap(p,state.settings):0; if(c.gap!==0&&m&&Math.abs(c.gap)===m) return '受好評與指名單價限制，達成項目全部達成時，這已是最接近的結果'; return c.gap===0?'四個月獎金總和剛好等於每月獎金 × '+MONTHS.length:c.gap>0?'多發了 '+fmt(c.gap)+'，可減少紀錄次數':'還差 '+fmt(-c.gap)+'，按「自動補齊差額」可補足';};
 
 function renderAll(){renderStats();renderRoster();renderDetail();save();}
 
