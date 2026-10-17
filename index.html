@@ -80,7 +80,7 @@ h1,h2,h3{margin:0;text-wrap:balance;line-height:1.25}
 .row .nm{font-weight:500;display:flex;flex-direction:column;line-height:1.2}
 .row .nm small{font-size:11px;color:var(--muted);font-weight:400;margin-top:2px}
 .pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
-.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.near{background:var(--accent-soft);color:var(--accent)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
 .mobile-nav{display:none;gap:8px;margin-bottom:14px}
 .mobile-nav select{flex:1;padding:10px 12px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);min-width:0}
 
@@ -269,7 +269,9 @@ const ITEMS=[
 const ITEM=Object.fromEntries(ITEMS.map(t=>[t.k,t]));
 const eligible=(t,p)=>!t.elig||t.elig(p);
 const DEFAULT_SETTINGS={base:29500,mode:'season',tol:5000,
-  rates:{review:1500,nominate:500,manager:5000,snow:5000,ski:5000,mentor:5000,noComplaint:10000,resort:10000}};
+  rates:{review:1500,nominate:1500,manager:5000,snow:5000,ski:5000,mentor:5000,noComplaint:12500,resort:12500}};
+// 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
+const RULES_VER=3;
 const Z=()=>[0,0,0,0], ONE=()=>[1,1,1,1];
 function P(id,rank,name,salary,allowance,note,retain,flags,counts){
   const c={}; for(const t of ITEMS) c[t.k]=Z();
@@ -298,12 +300,19 @@ function load(){
     if(raw){const s=JSON.parse(raw); if(s&&s.people&&s.settings){
       for(const p of s.people) for(const t of ITEMS) if(!Array.isArray(p.counts[t.k])) p.counts[t.k]=Z();
       for(const t of ITEMS) if(s.settings.rates[t.k]==null) s.settings.rates[t.k]=DEFAULT_SETTINGS.rates[t.k];
+      if(s.rulesVer!==RULES_VER){
+        s.settings.rates=JSON.parse(JSON.stringify(DEFAULT_SETTINGS.rates));
+        for(const p of s.people) setFlags(p);
+        s.rulesVer=RULES_VER;
+      }
       return s;
     }}
   }catch(e){}
   return fresh();
 }
-function fresh(){return {settings:JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),people:JSON.parse(JSON.stringify(DEFAULT_PEOPLE)),sel:1};}
+function fresh(){const st={settings:JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),people:JSON.parse(JSON.stringify(DEFAULT_PEOPLE)),sel:1,rulesVer:RULES_VER};for(const p of st.people)setFlags(p);return st;}
+// 適用的達成項目四個月都設為達成，不適用的歸零
+function setFlags(p){for(const t of ITEMS) if(t.kind==='flag') p.counts[t.k]=eligible(t,p)?ONE():Z();}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
 
 /* ---------- 計算（對應試算表各欄） ---------- */
@@ -351,39 +360,38 @@ function fixMonth(counts,i,residual,s){
   counts.review[i]+=best.a; counts.nominate[i]+=best.b;
   return true;
 }
-// 把四個月的目標拆開：每月在「每月獎金」上下浮動 ±tol，四個月加總剛好等於 target
-function monthTargets(target,s){
-  const n=MONTHS.length, G=g(s.rates.review,s.rates.nominate);
+// 規劃每月「好評＋指名」的金額：達成項目全部達成，總差額盡量為 0，每月差額在 ±tol 內
+function plan(p,s,random){
+  const c=calc(p,s), n=MONTHS.length, G=g(s.rates.review,s.rates.nominate);
   const tol=Math.max(0,+s.tol||0);
-  const q=Math.floor(target/n/G)*G;
-  const tgt=MONTHS.map(()=>q);
-  let rem=target-q*n;
-  for(const i of shuffle([0,1,2,3])){if(rem>=G){tgt[i]+=G;rem-=G;}}
-  if(rem!==0) return null;
-  const span=Math.max(0,Math.floor((tol-G)/G));
-  if(span>0){
-    for(let t=0;t<50;t++){
-      const o=[0,1,2].map(()=>rnd(-span,span)*G);
-      const last=-(o[0]+o[1]+o[2]);
-      if(Math.abs(last)<=span*G){o.push(last);shuffle(o);o.forEach((x,i)=>tgt[i]+=x);break;}
+  let F=0; for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=s.rates[t.k];
+  const need=c.targetVar-n*F;                 // 四個月好評＋指名要湊的金額
+  if(need<0) return null;
+  const lo=Math.floor(need/G)*G, hi=lo+G;      // 最接近的兩個可湊金額
+  const U=(need-lo<=hi-need)?lo:hi;
+  const per=c.N-F;                             // 每月理想金額
+  const ok=(x)=>x>=0&&Math.abs(F+x-c.N)<=tol;
+  const u=MONTHS.map(()=>Math.floor(U/n/G)*G);
+  let rem=U-u.reduce((a,b)=>a+b,0);
+  const order=shuffle([0,1,2,3]).sort((i,j)=>random?0:i-j);
+  for(const i of order){if(rem>=G){u[i]+=G;rem-=G;}}
+  while(rem>=G){u[order[0]]+=G;rem-=G;}
+  if(random){
+    for(let k=0;k<60;k++){
+      const i=rnd(0,n-1), j=rnd(0,n-1); if(i===j) continue;
+      const step=G*rnd(1,3);
+      if(ok(u[i]+step)&&ok(u[j]-step)){u[i]+=step;u[j]-=step;}
     }
   }
-  return tgt.some(x=>x<0)?null:tgt;
+  return {F,u,per};
 }
-function randomCounts(p,target,s,allFlags){
-  const tgt=monthTargets(target,s); if(!tgt) return null;
+function fill(p,s,pl,random){
   const counts={}; for(const t of ITEMS) counts[t.k]=Z();
+  for(const t of ITEMS) if(t.kind==='flag') counts[t.k]=eligible(t,p)?ONE():Z();
   for(let i=0;i<MONTHS.length;i++){
-    let flagAmt=0;
-    for(const t of ITEMS){
-      if(t.kind!=='flag'||!eligible(t,p)) continue;
-      counts[t.k][i]=allFlags?1:(Math.random()<0.85?1:0);   // 有資格的項目每月都達成
-      flagAmt+=counts[t.k][i]*s.rates[t.k];
-    }
-    let left=tgt[i]-flagAmt;
-    if(left<0) return null;
-    const nomShare=0.08+Math.random()*0.2;        // 指名佔剩餘金額約 8%–28%
-    counts.nominate[i]=Math.round(left*nomShare/s.rates.nominate);
+    const left=pl.u[i];
+    const share=random?0.15+Math.random()*0.3:0.3;   // 指名約佔 15%–45%
+    counts.nominate[i]=Math.round(left*share/s.rates.nominate);
     counts.review[i]=Math.round((left-counts.nominate[i]*s.rates.nominate)/s.rates.review);
     const got=counts.nominate[i]*s.rates.nominate+counts.review[i]*s.rates.review;
     if(!fixMonth(counts,i,left-got,s)) return null;
@@ -391,34 +399,24 @@ function randomCounts(p,target,s,allFlags){
   return counts;
 }
 function simulate(p,s){
-  const target=calc(p,s).targetVar;
-  if(target<=0){for(const t of ITEMS)p.counts[t.k]=Z(); return target===0;}
-  // 先讓所有適用的達成項目都達成，只用好評與指名做變動；金額不夠容納時才退回部分達成
-  for(let i=0;i<300;i++){const c=randomCounts(p,target,s,true); if(c){p.counts=c; return true;}}
-  for(let i=0;i<300;i++){const c=randomCounts(p,target,s,false); if(c){p.counts=c; return true;}}
+  for(let i=0;i<50;i++){
+    const pl=plan(p,s,true); if(!pl) return false;
+    const c=fill(p,s,pl,true); if(c){p.counts=c; return true;}
+  }
   return false;
 }
-// 自動補齊：保留達成項目，逐月只調整好評與指名，讓每月獎金剛好等於每月獎金；超額太多時才關閉達成項目
+// 自動補齊：達成項目全部達成，好評與指名平均分配到四個月，讓總差額盡量為 0
 function balance(p,s){
-  const c=calc(p,s);
-  const copy={}; for(const t of ITEMS) copy[t.k]=p.counts[t.k].slice();
-  const n=MONTHS.length, G=g(s.rates.review,s.rates.nominate);
-  const q=Math.floor(c.targetVar/n/G)*G;
-  const tgt=MONTHS.map(()=>q); let rem=c.targetVar-q*n;
-  for(let i=0;i<n&&rem>=G;i++){tgt[i]+=G;rem-=G;}
-  if(rem!==0) return false;
-  const flags=ITEMS.filter(t=>t.kind==='flag').sort((a,b)=>s.rates[b.k]-s.rates[a.k]);
-  for(let i=0;i<n;i++){
-    for(const t of ITEMS) if(!eligible(t,p)) copy[t.k][i]=0;
-    let residual=tgt[i]-c.months[i].variable, guard=0;
-    while(!fixMonth(copy,i,residual,s)){
-      if(residual>=0||guard++>50) return false;
-      const t=flags.find(t=>copy[t.k][i]>0);
-      if(!t) return false;
-      copy[t.k][i]--; residual+=s.rates[t.k];
-    }
-  }
-  p.counts=copy; return true;
+  const pl=plan(p,s,false); if(!pl) return false;
+  const c=fill(p,s,pl,false); if(!c) return false;
+  p.counts=c; return true;
+}
+// 單價造成無法剛好相符時，最接近的差額（0 表示可以剛好）
+function minGap(p,s){
+  const c=calc(p,s), G=g(s.rates.review,s.rates.nominate);
+  let F=0; for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=s.rates[t.k];
+  const need=c.targetVar-MONTHS.length*F; if(need<0) return null;
+  const r=((need%G)+G)%G; return r===0?0:(r<=G-r?r:G-r);
 }
 
 /* ---------- 畫面 ---------- */
@@ -427,22 +425,25 @@ const fmt=n=>Math.round(n).toLocaleString('zh-TW');
 const sgn=n=>(n>0?'+':n<0?'−':'±')+fmt(Math.abs(n));
 const esc=s=>String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 function person(){return state.people.find(p=>p.id===state.sel)||state.people[0];}
-function gapPill(gap){
+// 是否已是單價限制下最接近的結果
+const isNear=(p,c)=>{const m=minGap(p,state.settings);return c.gap!==0&&!!m&&Math.abs(c.gap)===m;};
+function gapPill(gap,near){
   if(gap===0) return `<span class="pill ok">達標</span>`;
+  if(near) return `<span class="pill near">最接近 ${sgn(gap)}</span>`;
   return `<span class="pill ${gap>0?'warn':'bad'}">${sgn(gap)}</span>`;
 }
-const verdictText=(c)=>c.gap===0?'四個月獎金總和剛好等於每月獎金 × '+MONTHS.length:c.gap>0?'多發了 '+fmt(c.gap)+'，可減少紀錄次數':'還差 '+fmt(-c.gap)+'，按「自動補齊差額」可補足';
+const verdictText=(c,p)=>{const m=p?minGap(p,state.settings):0; if(c.gap!==0&&m&&Math.abs(c.gap)===m) return '好評與指名每次 '+fmt(state.settings.rates.review)+'，達成項目全部達成時，這已是最接近的結果'; return c.gap===0?'四個月獎金總和剛好等於每月獎金 × '+MONTHS.length:c.gap>0?'多發了 '+fmt(c.gap)+'，可減少紀錄次數':'還差 '+fmt(-c.gap)+'，按「自動補齊差額」可補足';};
 
 function renderAll(){renderStats();renderRoster();renderDetail();save();}
 
 function renderStats(){
   const s=state.settings; let exp=0,act=0,ok=0;
-  for(const p of state.people){const c=calc(p,s);exp+=c.expected;act+=c.totalActual;if(c.gap===0)ok++;}
+  for(const p of state.people){const c=calc(p,s);exp+=c.expected;act+=c.totalActual;if(c.gap===0||isNear(p,c))ok++;}
   $('#stats').innerHTML=`
     <div class="stat"><div class="lbl">教練人數</div><div class="val">${state.people.length}<small>位</small></div></div>
     <div class="stat"><div class="lbl">全員應領總薪水</div><div class="val">${fmt(exp)}</div></div>
     <div class="stat"><div class="lbl">全員實領總薪水</div><div class="val">${fmt(act)}<small class="${act-exp===0?'pos':act-exp>0?'':'neg'}">${act-exp===0?'相符':sgn(act-exp)}</small></div></div>
-    <div class="stat"><div class="lbl">實領＝應領</div><div class="val">${ok}<small>／ ${state.people.length} 位</small></div></div>`;
+    <div class="stat"><div class="lbl">達標或已最接近</div><div class="val">${ok}<small>／ ${state.people.length} 位</small></div></div>`;
 }
 function renderRoster(){
   const s=state.settings;
@@ -451,9 +452,9 @@ function renderRoster(){
     return `<button class="row ${p.id===state.sel?'active':''}" data-id="${p.id}">
       <span class="idx">${i+1}</span>
       <span class="nm">${esc(p.name)}<small>${esc(p.rank)} · 應領 ${fmt(c.expected)}</small></span>
-      ${gapPill(c.gap)}</button>`;
+      ${gapPill(c.gap,isNear(p,c))}</button>`;
   }).join('');
-  $('#pickP').innerHTML=state.people.map((p,i)=>{const c=calc(p,s);return `<option value="${p.id}" ${p.id===state.sel?'selected':''}>${i+1}. ${esc(p.name)} · ${esc(p.rank)} · ${c.gap===0?'達標':sgn(c.gap)}</option>`;}).join('');
+  $('#pickP').innerHTML=state.people.map((p,i)=>{const c=calc(p,s);return `<option value="${p.id}" ${p.id===state.sel?'selected':''}>${i+1}. ${esc(p.name)} · ${esc(p.rank)} · ${c.gap===0?'達標':(isNear(p,c)?'最接近 ':'')+sgn(c.gap)}</option>`;}).join('');
 }
 
 function renderDetail(){
@@ -503,7 +504,7 @@ function renderDetail(){
       </div>
       <div class="actions">
         <button class="btn primary" id="simOne">隨機模擬此人</button>
-        <button class="btn" id="balOne" title="保留達成項目，只調整好評與指名次數">自動補齊差額</button>
+        <button class="btn" id="balOne" title="達成項目全部達成，只調整好評與指名次數">自動補齊差額</button>
         <button class="btn" id="clearOne">清空紀錄</button>
         <button class="btn danger small" id="delOne">刪除</button>
       </div>
@@ -540,10 +541,10 @@ function renderDetail(){
           <div><span class="k sum">實領總薪水</span><span class="sum" data-totact>${fmt(c.totalActual)}</span></div>
           <div><span class="k sum">應領總薪水</span><span class="sum">${fmt(c.expected)}</span></div>
         </div>
-        <div class="verdict ${c.gap===0?'ok':c.gap>0?'warn':'bad'}" data-verdict>
+        <div class="verdict ${c.gap===0||isNear(p,c)?'ok':c.gap>0?'warn':'bad'}" data-verdict>
           <div class="lbl">實領 − 應領</div>
           <div class="big">${c.gap===0?'剛好相符':sgn(c.gap)}</div>
-          <div class="cmp">${verdictText(c)}</div>
+          <div class="cmp">${verdictText(c,p)}</div>
         </div>
       </div>
     </div>
@@ -562,9 +563,9 @@ function refreshNumbers(){
   el.querySelector('[data-sumact]').textContent=fmt(c.sumActual);
   el.querySelector('[data-totact]').textContent=fmt(c.totalActual);
   const v=el.querySelector('[data-verdict]');
-  v.className='verdict '+(c.gap===0?'ok':c.gap>0?'warn':'bad');
+  v.className='verdict '+(c.gap===0||isNear(p,c)?'ok':c.gap>0?'warn':'bad');
   v.querySelector('.big').textContent=c.gap===0?'剛好相符':sgn(c.gap);
-  v.querySelector('.cmp').textContent=verdictText(c);
+  v.querySelector('.cmp').textContent=verdictText(c,p);
   renderStats();renderRoster();save();
 }
 function bindDetail(el,p){
@@ -591,15 +592,15 @@ function bindDetail(el,p){
     inp.addEventListener('change',()=>{
       const f=inp.dataset.f;
       if(['salary','allowance','retain'].includes(f)) p[f]=Math.max(0,parseInt(inp.value,10)||0);
-      else if(['manager','snow','ski'].includes(f)){p[f]=inp.checked; if(!inp.checked)p.counts[f]=Z(); else p.counts[f]=ONE();}
-      else if(f==='rank'){p[f]=inp.value; p.counts.mentor=p.rank===SENIOR?ONE():Z();}
+      else if(['manager','snow','ski'].includes(f)){p[f]=inp.checked; setFlags(p);}
+      else if(f==='rank'){p[f]=inp.value; setFlags(p);}
       else p[f]=inp.value.trim()||(f==='name'?'未命名':'');
       renderAll();
     });
   });
-  $('#simOne').onclick=()=>{if(simulate(p,state.settings)){renderAll();toast(`${p.name} 已隨機模擬，實領＝應領，每月差額在 ±${fmt(state.settings.tol)} 內`);}else{renderAll();toast('無法用目前單價湊出剛好的金額，請調整設定');}};
-  $('#balOne').onclick=()=>{if(balance(p,state.settings)){renderAll();toast('已補齊，每月實領＝每月應領');}else toast('無法補齊，請檢查單價設定或先調整次數');};
-  $('#clearOne').onclick=()=>{for(const t of ITEMS)p.counts[t.k]=Z();renderAll();};
+  $('#simOne').onclick=()=>{if(simulate(p,state.settings)){renderAll();toast(`${p.name} 已隨機模擬，達成項目全部達成，每月差額在 ±${fmt(state.settings.tol)} 內`);}else{renderAll();toast('無法用目前單價湊出剛好的金額，請調整設定');}};
+  $('#balOne').onclick=()=>{if(balance(p,state.settings)){renderAll();toast('已補齊，達成項目全部達成');}else toast('無法補齊，請檢查單價設定或先調整次數');};
+  $('#clearOne').onclick=()=>{p.counts.review=Z();p.counts.nominate=Z();setFlags(p);renderAll();};
   $('#delOne').onclick=()=>{
     if(!armed($('#delOne'),'確定刪除？'))return;
     const i=state.people.findIndex(x=>x.id===p.id);
@@ -623,7 +624,7 @@ $('#addP').onclick=()=>{
 $('#simAll').onclick=()=>{
   let fail=0;for(const p of state.people)if(!simulate(p,state.settings))fail++;
   renderAll();
-  toast(fail?`已模擬，其中 ${fail} 位無法湊出剛好金額`:`全員 ${state.people.length} 位皆已隨機模擬，實領＝應領，每月差額在 ±${fmt(state.settings.tol)} 內`);
+  toast(fail?`已模擬，其中 ${fail} 位無法模擬，請檢查單價設定`:`全員 ${state.people.length} 位已隨機模擬，達成項目全部達成，每月差額在 ±${fmt(state.settings.tol)} 內`);
 };
 $('#copyAll').onclick=async()=>{
   const s=state.settings;
