@@ -269,9 +269,9 @@ const ITEMS=[
 const ITEM=Object.fromEntries(ITEMS.map(t=>[t.k,t]));
 const eligible=(t,p)=>!t.elig||t.elig(p);
 const DEFAULT_SETTINGS={base:29500,mode:'season',tol:5000,
-  rates:{review:1000,nominate:1500,manager:5000,snow:5000,ski:5000,mentor:5000,noComplaint:15000,resort:10000}};
+  rates:{review:500,nominate:1500,manager:5000,snow:5000,ski:5000,mentor:5000,noComplaint:15000,resort:10000}};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
-const RULES_VER=4;
+const RULES_VER=5;
 const Z=()=>[0,0,0,0], ONE=()=>[1,1,1,1];
 function P(id,rank,name,salary,allowance,note,retain,flags,counts){
   const c={}; for(const t of ITEMS) c[t.k]=Z();
