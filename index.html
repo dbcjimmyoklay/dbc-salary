@@ -234,6 +234,8 @@ dialog::backdrop{background:rgba(10,14,20,.5)}
     </div>
     <div class="field"><label>月發獎金單價</label></div>
     <div class="grid" id="rateGrid"></div>
+    <div class="field"><label>單板 lv2 與雙板 lv2 都有的人，改用以下單價</label></div>
+    <div class="grid" id="dualGrid"></div>
     <div>
       <div class="field"><label>實領總薪水的計算方式</label></div>
       <div class="radio">
@@ -269,9 +271,14 @@ const ITEMS=[
 const ITEM=Object.fromEntries(ITEMS.map(t=>[t.k,t]));
 const eligible=(t,p)=>!t.elig||t.elig(p);
 const DEFAULT_SETTINGS={base:29500,mode:'season',tol:5000,
-  rates:{review:500,nominate:1500,manager:5000,snow:5000,ski:5000,mentor:5000,noComplaint:15000,resort:10000}};
+  rates:{review:500,nominate:1500,manager:5000,snow:5000,ski:5000,mentor:5000,noComplaint:15000,resort:10000},
+  // 單板 lv2 與雙板 lv2 都有的人，這幾項改用以下單價
+  dualRates:{snow:10000,ski:10000,noComplaint:30000}};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
-const RULES_VER=5;
+const RULES_VER=6;
+const isDual=p=>!!(p.snow&&p.ski);
+// 取得某人某項目的單價
+function rateOf(k,p,s){return isDual(p)&&s.dualRates&&s.dualRates[k]!=null?s.dualRates[k]:s.rates[k];}
 const Z=()=>[0,0,0,0], ONE=()=>[1,1,1,1];
 function P(id,rank,name,salary,allowance,note,retain,flags,counts){
   const c={}; for(const t of ITEMS) c[t.k]=Z();
@@ -302,6 +309,7 @@ function load(){
       for(const t of ITEMS) if(s.settings.rates[t.k]==null) s.settings.rates[t.k]=DEFAULT_SETTINGS.rates[t.k];
       if(s.rulesVer!==RULES_VER){
         s.settings.rates=JSON.parse(JSON.stringify(DEFAULT_SETTINGS.rates));
+        s.settings.dualRates=JSON.parse(JSON.stringify(DEFAULT_SETTINGS.dualRates));
         for(const p of s.people) setFlags(p);
         s.rulesVer=RULES_VER;
       }
@@ -326,7 +334,7 @@ function calc(p,s){
   const AZ=N+s.base;                                    // CH 每月應領
   const months=MONTHS.map((_,i)=>{
     const subs={}; let v=0;
-    for(const t of ITEMS){subs[t.k]=eligible(t,p)?(+p.counts[t.k][i]||0)*s.rates[t.k]:0; v+=subs[t.k];}
+    for(const t of ITEMS){subs[t.k]=eligible(t,p)?(+p.counts[t.k][i]||0)*rateOf(t.k,p,s):0; v+=subs[t.k];}
     const actual=s.base+v;                              // CI 當月實領 ＝ 底薪 ＋ 當月全部獎金小計
     return {subs,variable:v,actual,diff:actual-AZ};     // CJ +/-
   });
@@ -364,7 +372,7 @@ function fixMonth(counts,i,residual,s){
 function plan(p,s,random){
   const c=calc(p,s), n=MONTHS.length, G=g(s.rates.review,s.rates.nominate);
   const tol=Math.max(0,+s.tol||0);
-  let F=0; for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=s.rates[t.k];
+  let F=0; for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=rateOf(t.k,p,s);
   const need=c.targetVar-n*F;                 // 四個月好評＋指名要湊的金額
   if(need<0) return null;
   const lo=Math.floor(need/G)*G, hi=lo+G;      // 最接近的兩個可湊金額
@@ -416,7 +424,7 @@ function balance(p,s){
 // 單價造成無法剛好相符時，最接近的差額（0 表示可以剛好）
 function minGap(p,s){
   const c=calc(p,s), G=g(s.rates.review,s.rates.nominate);
-  let F=0; for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=s.rates[t.k];
+  let F=0; for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=rateOf(t.k,p,s);
   const need=c.targetVar-MONTHS.length*F; if(need<0) return null;
   const r=((need%G)+G)%G; return r===0?0:(r<=G-r?r:G-r);
 }
@@ -482,7 +490,7 @@ function renderDetail(){
       </div>`).join('');
     const flagRows=flags.map(t=>`
       <div class="mrow flag">
-        <div class="t">${t.label}<small>達成 ${fmt(s.rates[t.k])}</small></div>
+        <div class="t">${t.label}<small>達成 ${fmt(rateOf(t.k,p,s))}${isDual(p)&&s.dualRates&&s.dualRates[t.k]!=null?'（單雙板加碼）':''}</small></div>
         <button type="button" class="switch" role="switch" aria-checked="${(p.counts[t.k][i]||0)>0}" data-flag="${t.k}" data-i="${i}" aria-label="${m} ${t.label}"></button>
       </div>`).join('');
     return `<div class="mcard">
@@ -654,6 +662,8 @@ $('#openSettings').onclick=()=>{
   const s=state.settings;
   $('#s_base').value=s.base;$('#s_tol').value=s.tol;
   $('#rateGrid').innerHTML=ITEMS.map(t=>`<div class="field"><label>${t.label}${t.kind==='count'?' · 每'+t.unit:' · 每月達成'}${t.who?'（'+t.who+'）':''}</label><input type="number" inputmode="numeric" data-rate="${t.k}" value="${s.rates[t.k]}"></div>`).join('');
+  if(!s.dualRates) s.dualRates=JSON.parse(JSON.stringify(DEFAULT_SETTINGS.dualRates));
+  $('#dualGrid').innerHTML=Object.keys(s.dualRates).map(k=>`<div class="field"><label>${ITEM[k].label} · 每月達成</label><input type="number" inputmode="numeric" data-dual="${k}" value="${s.dualRates[k]}"></div>`).join('');
   dlg.querySelector(`input[name=mode][value=${s.mode}]`).checked=true;
   dlg.showModal();
 };
@@ -663,6 +673,7 @@ $('#saveSettings').onclick=()=>{
   s.base=Math.max(0,parseInt($('#s_base').value,10)||0);
   s.tol=Math.max(0,parseInt($('#s_tol').value,10)||0);
   dlg.querySelectorAll('input[data-rate]').forEach(inp=>{s.rates[inp.dataset.rate]=Math.max(1,parseInt(inp.value,10)||1);});
+  dlg.querySelectorAll('input[data-dual]').forEach(inp=>{s.dualRates[inp.dataset.dual]=Math.max(1,parseInt(inp.value,10)||1);});
   s.mode=dlg.querySelector('input[name=mode]:checked').value;
   dlg.close();renderAll();toast('設定已儲存');
 };
