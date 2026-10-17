@@ -370,14 +370,14 @@ function monthTargets(target,s){
   }
   return tgt.some(x=>x<0)?null:tgt;
 }
-function randomCounts(p,target,s){
+function randomCounts(p,target,s,allFlags){
   const tgt=monthTargets(target,s); if(!tgt) return null;
   const counts={}; for(const t of ITEMS) counts[t.k]=Z();
   for(let i=0;i<MONTHS.length;i++){
     let flagAmt=0;
     for(const t of ITEMS){
       if(t.kind!=='flag'||!eligible(t,p)) continue;
-      counts[t.k][i]=Math.random()<0.85?1:0;     // 大多數月份達成
+      counts[t.k][i]=allFlags?1:(Math.random()<0.85?1:0);   // 有資格的項目每月都達成
       flagAmt+=counts[t.k][i]*s.rates[t.k];
     }
     let left=tgt[i]-flagAmt;
@@ -393,7 +393,9 @@ function randomCounts(p,target,s){
 function simulate(p,s){
   const target=calc(p,s).targetVar;
   if(target<=0){for(const t of ITEMS)p.counts[t.k]=Z(); return target===0;}
-  for(let i=0;i<300;i++){const c=randomCounts(p,target,s); if(c){p.counts=c; return true;}}
+  // 先讓所有適用的達成項目都達成，只用好評與指名做變動；金額不夠容納時才退回部分達成
+  for(let i=0;i<300;i++){const c=randomCounts(p,target,s,true); if(c){p.counts=c; return true;}}
+  for(let i=0;i<300;i++){const c=randomCounts(p,target,s,false); if(c){p.counts=c; return true;}}
   return false;
 }
 // 自動補齊：保留達成項目，逐月只調整好評與指名，讓每月獎金剛好等於每月獎金；超額太多時才關閉達成項目
@@ -509,7 +511,7 @@ function renderDetail(){
     <div class="fixed">
       <div class="field"><label>薪水（每月）</label><input type="number" inputmode="numeric" value="${p.salary}" data-f="salary"></div>
       <div class="field"><label>加給（每月）</label><input type="number" inputmode="numeric" value="${p.allowance}" data-f="allowance"></div>
-      <div class="field"><label>留任加給（總）</label><input type="number" inputmode="numeric" value="${p.retain}" data-f="retain"><span class="hint">季末一次性發放</span></div>
+      <div class="field"><label>留任加給（總）</label><input type="number" inputmode="numeric" value="${p.retain}" data-f="retain"><span class="hint">季初一次性發放</span></div>
       <div class="elig">
         <span class="lbl">適用的達成項目</span>
         <label class="tog"><input type="checkbox" data-f="manager" ${p.manager?'checked':''}>主管</label>
@@ -534,7 +536,7 @@ function renderDetail(){
           <div><span class="k">四個月實領合計（含底薪）</span><span data-sumact>${fmt(c.sumActual)}</span></div>
           ${s.mode==='sheet'
             ?`<div><span class="k">總實領底薪</span><span>${fmt(c.baseTotal)}</span></div>`
-            :`<div><span class="k">留任加給（季末一次性）</span><span>${fmt(c.retain)}</span></div>`}
+            :`<div><span class="k">留任加給（季初一次性）</span><span>${fmt(c.retain)}</span></div>`}
           <div><span class="k sum">實領總薪水</span><span class="sum" data-totact>${fmt(c.totalActual)}</span></div>
           <div><span class="k sum">應領總薪水</span><span class="sum">${fmt(c.expected)}</span></div>
         </div>
