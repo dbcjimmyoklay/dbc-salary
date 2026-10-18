@@ -276,13 +276,15 @@ const RATE_RANKS=[SENIOR,CONTRACT];
 // 單價依階級設定：同階級同項目同金額。全部達成時，每人每月達成項目合計剛好等於每月獎金
 const DEFAULT_SETTINGS={base:29500,mode:'season',
   rates:{
-    [SENIOR]:  {manager:5000,snow:10000,ski:10000,dualSnow:20000,dualSki:20000,mentor:4500,noComplaint:15000,resort:10000,grade:{'S':1500,'A+':1000,'A':500}},
-    [CONTRACT]:{manager:5000,snow:5000, ski:5000, dualSnow:5000,dualSki:5000,mentor:0,   noComplaint:15000,resort:10000,grade:{'S':6000,'A+':5500,'A':5000}}
+    [SENIOR]:  {manager:5000,snow:10000,ski:10000,dualSnow:20000,dualSki:20000,mentor:4500,noComplaint:15000,resort:10000,grade:{'S':1500,'A+':1000,'A':500,'B':0}},
+    [CONTRACT]:{manager:5000,snow:5000, ski:5000, dualSnow:5000,dualSki:5000,mentor:0,   noComplaint:15000,resort:10000,grade:{'S':6000,'A+':5500,'A':5000,'B':0}}
   }};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
-const RULES_VER=10;
+const RULES_VER=11;
 // 月度表現評等的三個等級
-const GRADES=['S','A+','A'];
+const GRADES=['S','A+','A','B'];
+// 隨機模擬只用這三級（B 為 0，留給手動選擇），每月差額才會小
+const SIM_GRADES=['S','A+','A'];
 const MID=()=>['A+','A+','A+','A+'];
 // 取得某人某項目的單價（「其他」階級沿用合約教練）
 // 單板與雙板證照都有的人，訓練獎金改用較高的 dualSnow / dualSki
@@ -297,7 +299,7 @@ function gradeAmt(p,s,g){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};return +
 // 四個月評等的所有組合中，加總剛好等於所需金額的組合
 function gradeCombos(p,s){
   const c=calc(p,s), need=c.targetVar-MONTHS.length*fullMonthly(p,s), out=[];
-  for(const a of GRADES)for(const b of GRADES)for(const d of GRADES)for(const e of GRADES){
+  for(const a of SIM_GRADES)for(const b of SIM_GRADES)for(const d of SIM_GRADES)for(const e of SIM_GRADES){
     const g=[a,b,d,e]; if(g.reduce((x,k)=>x+gradeAmt(p,s,k),0)===need) out.push(g);
   }
   return {need,list:out};
