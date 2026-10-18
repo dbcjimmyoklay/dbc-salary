@@ -169,6 +169,8 @@ dialog::backdrop{background:rgba(10,14,20,.5)}
 .radio small{color:var(--muted);font-size:12px;line-height:1.4}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:calc(100% - 32px);text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.rate-ranks{display:grid;gap:14px}
+.rate-ranks h4{margin:0 0 6px;font-size:13px;color:var(--ink-2)}
 .help{font-size:12px;color:var(--muted);line-height:1.5;margin:0}
 .empty{padding:40px;text-align:center;color:var(--muted)}
 
@@ -202,7 +204,7 @@ dialog::backdrop{background:rgba(10,14,20,.5)}
       <div class="sub">雪季四個月 · 12月 – 3月 · 每月獎金依實際紀錄浮動</div>
     </div>
     <div class="actions">
-      <button class="btn primary" id="simAll">全員隨機模擬</button>
+      <button class="btn primary" id="simAll">全員設為全部達成</button>
       <button class="btn" id="copyAll">複製全員結果</button>
       <button class="btn" id="openSettings">設定</button>
     </div>
@@ -230,16 +232,12 @@ dialog::backdrop{background:rgba(10,14,20,.5)}
   <div class="dlg-body">
     <div class="grid">
       <div class="field"><label>每月底薪</label><input type="number" id="s_base" inputmode="numeric"></div>
-      <div class="field"><label>模擬時每月差額容許 ±</label><input type="number" id="s_tol" inputmode="numeric"></div>
     </div>
-    <div class="field"><label>月發獎金單價</label></div>
-    <div class="grid" id="rateGrid"></div>
-    <div class="field"><label>單板 lv2 與雙板 lv2 都有的人，改用以下單價</label></div>
-    <div class="grid" id="dualGrid"></div>
+    <div id="rateGrid" class="rate-ranks"></div>
     <div>
       <div class="field"><label>實領總薪水的計算方式</label></div>
       <div class="radio">
-        <label><input type="radio" name="mode" value="season"><span><b>四個月實領 ＋ 留任加給（建議）</b><small>實領總薪水 ＝ 四個月實領合計（含底薪）＋ 留任加給。四個月的獎金總和剛好等於「每月獎金 × 4」時，實領 ＝ 應領。</small></span></label>
+        <label><input type="radio" name="mode" value="season"><span><b>四個月實領 ＋ 留任加給（建議）</b><small>實領總薪水 ＝ 四個月實領合計（含底薪）＋ 留任加給。全部達成時每月達成項目合計等於每月獎金，實領 ＝ 應領。</small></span></label>
         <label><input type="radio" name="mode" value="sheet"><span><b>依原試算表公式</b><small>實領總薪水 ＝ 四個月實領合計（含底薪）＋ 總實領底薪 118,000。底薪會被計算兩次，留任加給不計入。</small></span></label>
       </div>
     </div>
@@ -257,10 +255,8 @@ dialog::backdrop{background:rgba(10,14,20,.5)}
 'use strict';
 const MONTHS=['12月','1月','2月','3月'];
 const SENIOR='資深教練';
-// 月發獎金項目（對應試算表 M 到 CF 欄）。kind:count 為次數，kind:flag 為當月達成與否（0/1）
+// 月發獎金項目（對應試算表 AE 到 CF 欄），每月達成記 1
 const ITEMS=[
-  {k:'review',      label:'好評',                 unit:'則', kind:'count'},
-  {k:'nominate',    label:'指名',                 unit:'次', kind:'count'},
   {k:'manager',     label:'主管管理無過失',       kind:'flag', elig:p=>!!p.manager,       who:'主管'},
   {k:'snow',        label:'單板lv2 訓練獎金',     kind:'flag', elig:p=>!!p.snow,          who:'單板lv2'},
   {k:'ski',         label:'雙板lv2 訓練獎金',     kind:'flag', elig:p=>!!p.ski,           who:'雙板lv2'},
@@ -270,15 +266,20 @@ const ITEMS=[
 ];
 const ITEM=Object.fromEntries(ITEMS.map(t=>[t.k,t]));
 const eligible=(t,p)=>!t.elig||t.elig(p);
-const DEFAULT_SETTINGS={base:29500,mode:'season',tol:5000,
-  rates:{review:500,nominate:1500,manager:5000,snow:5000,ski:5000,mentor:5000,noComplaint:15000,resort:10000},
-  // 單板 lv2 與雙板 lv2 都有的人，這幾項改用以下單價
-  dualRates:{snow:10000,ski:10000,noComplaint:30000}};
+const CONTRACT='合約教練';
+const RATE_RANKS=[SENIOR,CONTRACT];
+// 單價依階級設定：同階級同項目同金額。全部達成時，每人每月達成項目合計剛好等於每月獎金
+const DEFAULT_SETTINGS={base:29500,mode:'season',
+  rates:{
+    [SENIOR]:  {manager:5000,snow:10000,ski:30000,mentor:5000,noComplaint:15500,resort:10000},
+    [CONTRACT]:{manager:5000,snow:5000, ski:5000, mentor:0,   noComplaint:20500,resort:10000}
+  }};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
-const RULES_VER=6;
-const isDual=p=>!!(p.snow&&p.ski);
-// 取得某人某項目的單價
-function rateOf(k,p,s){return isDual(p)&&s.dualRates&&s.dualRates[k]!=null?s.dualRates[k]:s.rates[k];}
+const RULES_VER=7;
+// 取得某人某項目的單價（「其他」階級沿用合約教練）
+function rateOf(k,p,s){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};return +r[k]||0;}
+// 某人全部達成時的每月獎金
+function fullMonthly(p,s){let F=0;for(const t of ITEMS) if(eligible(t,p)) F+=rateOf(t.k,p,s);return F;}
 const Z=()=>[0,0,0,0], ONE=()=>[1,1,1,1];
 function P(id,rank,name,salary,allowance,note,retain,flags,counts){
   const c={}; for(const t of ITEMS) c[t.k]=Z();
@@ -287,11 +288,11 @@ function P(id,rank,name,salary,allowance,note,retain,flags,counts){
 }
 const STD={noComplaint:ONE(),resort:ONE()};
 const DEFAULT_PEOPLE=[
-  P(1,SENIOR,'許佩芸',110000,10000,'單板lv2 / 雙板lv2',80000,{snow:1,ski:1},{review:[6,5,6,5],nominate:[3,5,5,5],snow:ONE(),ski:ONE(),mentor:ONE(),...STD}),
-  P(2,SENIOR,'洪琦雅',110000,10000,'單板lv2 / 雙板lv2',80000,{snow:1,ski:1},{review:[9,6,2,3],nominate:[4,2,1,3],snow:ONE(),ski:ONE(),mentor:ONE(),...STD}),
-  P(3,SENIOR,'李玉鈞',90000,5000,'單板lv2 主管',80000,{snow:1,manager:1},{review:[9,3,2,2],nominate:[1,2,2,3],manager:ONE(),snow:ONE(),mentor:ONE(),...STD}),
-  P(4,SENIOR,'林凡',90000,5000,'單板lv2 主管',80000,{snow:1,manager:1},{review:[8,5,1,1],nominate:[5,3,2,1],manager:ONE(),snow:ONE(),mentor:ONE(),...STD}),
-  P(5,SENIOR,'郭融融',80000,0,'',80000,{},{review:[4,5,3,4],nominate:[2,2,3,1],mentor:ONE(),...STD}),
+  P(1,SENIOR,'許佩芸',110000,10000,'單板lv2 / 雙板lv2',80000,{snow:1,ski:1},{snow:ONE(),ski:ONE(),mentor:ONE(),...STD}),
+  P(2,SENIOR,'洪琦雅',110000,10000,'單板lv2 / 雙板lv2',80000,{snow:1,ski:1},{snow:ONE(),ski:ONE(),mentor:ONE(),...STD}),
+  P(3,SENIOR,'李玉鈞',90000,5000,'單板lv2 主管',80000,{snow:1,manager:1},{manager:ONE(),snow:ONE(),mentor:ONE(),...STD}),
+  P(4,SENIOR,'林凡',90000,5000,'單板lv2 主管',80000,{snow:1,manager:1},{manager:ONE(),snow:ONE(),mentor:ONE(),...STD}),
+  P(5,SENIOR,'郭融融',80000,0,'',80000,{},{mentor:ONE(),...STD}),
   P(6,'合約教練','孫楷程',70000,5000,'單板lv2',40000,{snow:1},{snow:ONE(),...STD}),
   P(7,'合約教練','邱德育',70000,5000,'單板lv2',40000,{snow:1},{snow:ONE(),...STD}),
   ...['江婉瑜','陳姿蓉','王莉如','林彥君','莊謹瑄','方培燊','翁嫚鍶','賴咸融','陳彥如','吳哲瑋','羅元甫','蔡長庭','張恩齊','吳承蔚','林冠辰']
@@ -306,11 +307,10 @@ function load(){
     const raw=localStorage.getItem(KEY);
     if(raw){const s=JSON.parse(raw); if(s&&s.people&&s.settings){
       for(const p of s.people) for(const t of ITEMS) if(!Array.isArray(p.counts[t.k])) p.counts[t.k]=Z();
-      for(const t of ITEMS) if(s.settings.rates[t.k]==null) s.settings.rates[t.k]=DEFAULT_SETTINGS.rates[t.k];
       if(s.rulesVer!==RULES_VER){
         s.settings.rates=JSON.parse(JSON.stringify(DEFAULT_SETTINGS.rates));
-        s.settings.dualRates=JSON.parse(JSON.stringify(DEFAULT_SETTINGS.dualRates));
-        for(const p of s.people) setFlags(p);
+        delete s.settings.dualRates; delete s.settings.tol;
+        for(const p of s.people){delete p.counts.review;delete p.counts.nominate;setFlags(p);}
         s.rulesVer=RULES_VER;
       }
       return s;
@@ -320,7 +320,7 @@ function load(){
 }
 function fresh(){const st={settings:JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),people:JSON.parse(JSON.stringify(DEFAULT_PEOPLE)),sel:1,rulesVer:RULES_VER};for(const p of st.people)setFlags(p);return st;}
 // 適用的達成項目四個月都設為達成，不適用的歸零
-function setFlags(p){for(const t of ITEMS) if(t.kind==='flag') p.counts[t.k]=eligible(t,p)?ONE():Z();}
+function setFlags(p){for(const t of ITEMS) p.counts[t.k]=eligible(t,p)?ONE():Z();}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
 
 /* ---------- 計算（對應試算表各欄） ---------- */
@@ -345,89 +345,9 @@ function calc(p,s){
   return {monthly,expected,baseTotal,retain,N,AZ,months,sumVar,sumActual,totalActual,gap:totalActual-expected,targetVar};
 }
 
-/* ---------- 隨機模擬 ---------- */
-function g(a,b){a=Math.abs(a);b=Math.abs(b);while(b){[a,b]=[b,a%b];}return a;}
-function rnd(a,b){return a+Math.floor(Math.random()*(b-a+1));}
-function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
-function egcd(a,b){if(b===0)return[a,1,0];const[gg,x,y]=egcd(b,a%b);return[gg,y,x-Math.floor(a/b)*y];}
-// 用「好評」與「指名」的次數微調某一個月的殘差，讓當月獎金剛好等於目標
-function fixMonth(counts,i,residual,s){
-  if(residual===0) return true;
-  const r1=s.rates.review, r2=s.rates.nominate, G=g(r1,r2);
-  if(residual%G!==0) return false;
-  const d=residual/G, u=r1/G, v=r2/G;
-  const [,x0,y0]=egcd(u,v);
-  let best=null; const K=Math.abs(d)+8;
-  for(let k=-K;k<=K;k++){
-    const a=x0*d+v*k, b=y0*d-u*k;
-    if(counts.review[i]+a<0||counts.nominate[i]+b<0) continue;
-    const cost=Math.abs(a)+Math.abs(b)*0.6;   // 指名單價小，多動幾次也無妨
-    if(!best||cost<best.cost) best={a,b,cost};
-  }
-  if(!best) return false;
-  counts.review[i]+=best.a; counts.nominate[i]+=best.b;
-  return true;
-}
-// 規劃每月「好評＋指名」的金額：達成項目全部達成，總差額盡量為 0，每月差額在 ±tol 內
-function plan(p,s,random){
-  const c=calc(p,s), n=MONTHS.length, G=g(s.rates.review,s.rates.nominate);
-  const tol=Math.max(0,+s.tol||0);
-  let F=0; for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=rateOf(t.k,p,s);
-  const need=c.targetVar-n*F;                 // 四個月好評＋指名要湊的金額
-  if(need<0) return null;
-  const lo=Math.floor(need/G)*G, hi=lo+G;      // 最接近的兩個可湊金額
-  const U=(need-lo<=hi-need)?lo:hi;
-  const per=c.N-F;                             // 每月理想金額
-  const ok=(x)=>x>=0&&Math.abs(F+x-c.N)<=tol;
-  const u=MONTHS.map(()=>Math.floor(U/n/G)*G);
-  let rem=U-u.reduce((a,b)=>a+b,0);
-  const order=shuffle([0,1,2,3]).sort((i,j)=>random?0:i-j);
-  for(const i of order){if(rem>=G){u[i]+=G;rem-=G;}}
-  while(rem>=G){u[order[0]]+=G;rem-=G;}
-  if(random){
-    for(let k=0;k<60;k++){
-      const i=rnd(0,n-1), j=rnd(0,n-1); if(i===j) continue;
-      const step=G*rnd(1,3);
-      if(ok(u[i]+step)&&ok(u[j]-step)){u[i]+=step;u[j]-=step;}
-    }
-  }
-  return {F,u,per};
-}
-function fill(p,s,pl,random){
-  const counts={}; for(const t of ITEMS) counts[t.k]=Z();
-  for(const t of ITEMS) if(t.kind==='flag') counts[t.k]=eligible(t,p)?ONE():Z();
-  for(let i=0;i<MONTHS.length;i++){
-    const left=pl.u[i];
-    const share=random?0.15+Math.random()*0.3:0.3;   // 指名約佔 15%–45%
-    counts.nominate[i]=Math.round(left*share/s.rates.nominate);
-    counts.review[i]=Math.round((left-counts.nominate[i]*s.rates.nominate)/s.rates.review);
-    const got=counts.nominate[i]*s.rates.nominate+counts.review[i]*s.rates.review;
-    if(!fixMonth(counts,i,left-got,s)) return null;
-  }
-  return counts;
-}
-function simulate(p,s){
-  for(let i=0;i<50;i++){
-    const pl=plan(p,s,true); if(!pl) return false;
-    const c=fill(p,s,pl,true); if(c){p.counts=c; return true;}
-  }
-  return false;
-}
-// 自動補齊：達成項目全部達成，好評與指名平均分配到四個月，讓總差額盡量為 0
-function balance(p,s){
-  const pl=plan(p,s,false); if(!pl) return false;
-  const c=fill(p,s,pl,false);
-  if(c){p.counts=c; return true;}
-  // 平均分配湊不出來時（例如某月只剩 500），改用不同的月份分配再試
-  return simulate(p,s);
-}
-// 單價造成無法剛好相符時，最接近的差額（0 表示可以剛好）
-function minGap(p,s){
-  const c=calc(p,s), G=g(s.rates.review,s.rates.nominate);
-  let F=0; for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=rateOf(t.k,p,s);
-  const need=c.targetVar-MONTHS.length*F; if(need<0) return null;
-  const r=((need%G)+G)%G; return r===0?0:(r<=G-r?r:G-r);
-}
+/* ---------- 全部達成 ---------- */
+// 沒有次數類項目後，結果是固定的：適用的達成項目四個月全部達成
+function simulate(p){setFlags(p);return true;}
 
 /* ---------- 畫面 ---------- */
 const $=(sel,el=document)=>el.querySelector(sel);
@@ -436,13 +356,13 @@ const sgn=n=>(n>0?'+':n<0?'−':'±')+fmt(Math.abs(n));
 const esc=s=>String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
 function person(){return state.people.find(p=>p.id===state.sel)||state.people[0];}
 // 是否已是單價限制下最接近的結果
-const isNear=(p,c)=>{const m=minGap(p,state.settings);return c.gap!==0&&!!m&&Math.abs(c.gap)===m;};
+const isNear=()=>false;
 function gapPill(gap,near){
   if(gap===0) return `<span class="pill ok">達標</span>`;
   if(near) return `<span class="pill near">最接近 ${sgn(gap)}</span>`;
   return `<span class="pill ${gap>0?'warn':'bad'}">${sgn(gap)}</span>`;
 }
-const verdictText=(c,p)=>{const m=p?minGap(p,state.settings):0; if(c.gap!==0&&m&&Math.abs(c.gap)===m) return '受好評與指名單價限制，達成項目全部達成時，這已是最接近的結果'; return c.gap===0?'四個月獎金總和剛好等於每月獎金 × '+MONTHS.length:c.gap>0?'多發了 '+fmt(c.gap)+'，可減少紀錄次數':'還差 '+fmt(-c.gap)+'，按「自動補齊差額」可補足';};
+const verdictText=(c,p)=>{if(c.gap===0) return '全部達成時，實領剛好等於應領'; const F=p?fullMonthly(p,state.settings):0; if(p&&F!==c.N) return '此人全部達成時每月獎金為 '+fmt(F)+'，與每月獎金 '+fmt(c.N)+' 不同，請調整單價或薪資'; return c.gap<0?'還差 '+fmt(-c.gap)+'，有項目未達成':'多發了 '+fmt(c.gap);};
 
 function renderAll(){renderStats();renderRoster();renderDetail();save();}
 
@@ -453,7 +373,7 @@ function renderStats(){
     <div class="stat"><div class="lbl">教練人數</div><div class="val">${state.people.length}<small>位</small></div></div>
     <div class="stat"><div class="lbl">全員應領總薪水</div><div class="val">${fmt(exp)}</div></div>
     <div class="stat"><div class="lbl">全員實領總薪水</div><div class="val">${fmt(act)}<small class="${act-exp===0?'pos':act-exp>0?'':'neg'}">${act-exp===0?'相符':sgn(act-exp)}</small></div></div>
-    <div class="stat"><div class="lbl">達標或已最接近</div><div class="val">${ok}<small>／ ${state.people.length} 位</small></div></div>`;
+    <div class="stat"><div class="lbl">實領＝應領</div><div class="val">${ok}<small>／ ${state.people.length} 位</small></div></div>`;
 }
 function renderRoster(){
   const s=state.settings;
@@ -490,13 +410,12 @@ function renderDetail(){
       </div>`).join('');
     const flagRows=flags.map(t=>`
       <div class="mrow flag">
-        <div class="t">${t.label}<small>達成 ${fmt(rateOf(t.k,p,s))}${isDual(p)&&s.dualRates&&s.dualRates[t.k]!=null?'（單雙板加碼）':''}</small></div>
+        <div class="t">${t.label}<small>達成 ${fmt(rateOf(t.k,p,s))}</small></div>
         <button type="button" class="switch" role="switch" aria-checked="${(p.counts[t.k][i]||0)>0}" data-flag="${t.k}" data-i="${i}" aria-label="${m} ${t.label}"></button>
       </div>`).join('');
     return `<div class="mcard">
       <div class="mcard-head"><b>${m}</b><span>底薪 ${fmt(s.base)}</span></div>
       ${countRows}
-      <div class="divider">當月達成項目</div>
       ${flagRows}
       <div class="mfoot">
         <div><span class="k">當月獎金</span><span data-mvar="${i}">${fmt(mc.variable)}</span></div>
@@ -513,9 +432,8 @@ function renderDetail(){
         <input class="note" value="${esc(p.note)}" placeholder="備註" data-f="note" aria-label="備註">
       </div>
       <div class="actions">
-        <button class="btn primary" id="simOne">隨機模擬此人</button>
-        <button class="btn" id="balOne" title="達成項目全部達成，只調整好評與指名次數">自動補齊差額</button>
-        <button class="btn" id="clearOne">清空紀錄</button>
+        <button class="btn primary" id="simOne">設為全部達成</button>
+        <button class="btn" id="clearOne">全部設為未達成</button>
         <button class="btn danger small" id="delOne">刪除</button>
       </div>
     </div>
@@ -537,7 +455,7 @@ function renderDetail(){
       <div class="legend">${legend}</div>
     </div>
     <div class="section">
-      <div class="section-title"><h3>每月實際紀錄</h3><span class="eq">手動紀錄欄位 · 四個月獎金總和需達 <b>${fmt(c.targetVar)}</b>，模擬時每月差額控制在 ±${fmt(s.tol)}</span></div>
+      <div class="section-title"><h3>每月實際紀錄</h3><span class="eq">手動紀錄欄位 · 全部達成時每月 <b>${fmt(fullMonthly(p,s))}</b>，每月獎金 <b>${fmt(c.N)}</b>${fullMonthly(p,s)===c.N?'　剛好相符':'　<span class="neg">相差 '+sgn(fullMonthly(p,s)-c.N)+'</span>'}</span></div>
       <div class="months">${monthCards}</div>
     </div>
     <div class="section">
@@ -608,9 +526,8 @@ function bindDetail(el,p){
       renderAll();
     });
   });
-  $('#simOne').onclick=()=>{if(simulate(p,state.settings)){renderAll();toast(`${p.name} 已隨機模擬，達成項目全部達成，每月差額在 ±${fmt(state.settings.tol)} 內`);}else{renderAll();toast('無法用目前單價湊出剛好的金額，請調整設定');}};
-  $('#balOne').onclick=()=>{if(balance(p,state.settings)){renderAll();toast('已補齊，達成項目全部達成');}else toast('無法補齊，請檢查單價設定或先調整次數');};
-  $('#clearOne').onclick=()=>{p.counts.review=Z();p.counts.nominate=Z();setFlags(p);renderAll();};
+  $('#simOne').onclick=()=>{simulate(p);renderAll();toast(`${p.name} 已設為全部達成`);};
+  $('#clearOne').onclick=()=>{for(const t of ITEMS)p.counts[t.k]=Z();renderAll();};
   $('#delOne').onclick=()=>{
     if(!armed($('#delOne'),'確定刪除？'))return;
     const i=state.people.findIndex(x=>x.id===p.id);
@@ -627,14 +544,15 @@ $('#prevP').onclick=()=>{const i=state.people.findIndex(p=>p.id===state.sel);if(
 $('#nextP').onclick=()=>{const i=state.people.findIndex(p=>p.id===state.sel);if(i<state.people.length-1){state.sel=state.people[i+1].id;renderAll();}};
 $('#addP').onclick=()=>{
   const id=Math.max(0,...state.people.map(p=>p.id))+1;
-  state.people.push(P(id,'合約教練','新教練',70000,0,'',40000,{},{...STD}));
+  state.people.push(P(id,CONTRACT,'新教練',70000,0,'',40000,{},{...STD}));
   state.sel=id;renderAll();
   setTimeout(()=>{const n=$('#detail input.name');if(n){n.focus();n.select();}},0);
 };
 $('#simAll').onclick=()=>{
-  let fail=0;for(const p of state.people)if(!simulate(p,state.settings))fail++;
+  for(const p of state.people) simulate(p);
   renderAll();
-  toast(fail?`已模擬，其中 ${fail} 位無法模擬，請檢查單價設定`:`全員 ${state.people.length} 位已隨機模擬，達成項目全部達成，每月差額在 ±${fmt(state.settings.tol)} 內`);
+  const ok=state.people.filter(p=>calc(p,state.settings).gap===0).length;
+  toast(`全員 ${state.people.length} 位已設為全部達成，其中 ${ok} 位實領＝應領`);
 };
 $('#copyAll').onclick=async()=>{
   const s=state.settings;
@@ -660,10 +578,8 @@ $('#copyAll').onclick=async()=>{
 const dlg=$('#settings');
 $('#openSettings').onclick=()=>{
   const s=state.settings;
-  $('#s_base').value=s.base;$('#s_tol').value=s.tol;
-  $('#rateGrid').innerHTML=ITEMS.map(t=>`<div class="field"><label>${t.label}${t.kind==='count'?' · 每'+t.unit:' · 每月達成'}${t.who?'（'+t.who+'）':''}</label><input type="number" inputmode="numeric" data-rate="${t.k}" value="${s.rates[t.k]}"></div>`).join('');
-  if(!s.dualRates) s.dualRates=JSON.parse(JSON.stringify(DEFAULT_SETTINGS.dualRates));
-  $('#dualGrid').innerHTML=Object.keys(s.dualRates).map(k=>`<div class="field"><label>${ITEM[k].label} · 每月達成</label><input type="number" inputmode="numeric" data-dual="${k}" value="${s.dualRates[k]}"></div>`).join('');
+  $('#s_base').value=s.base;
+  $('#rateGrid').innerHTML=RATE_RANKS.map(r=>`<div><h4>${r} · 每月達成單價</h4><div class="grid">${ITEMS.filter(t=>!(r===CONTRACT&&t.k==='mentor')).map(t=>`<div class="field"><label>${t.label}${t.who?'（'+t.who+'）':''}</label><input type="number" inputmode="numeric" data-rank="${r}" data-rate="${t.k}" value="${(s.rates[r]||{})[t.k]||0}"></div>`).join('')}</div></div>`).join('');
   dlg.querySelector(`input[name=mode][value=${s.mode}]`).checked=true;
   dlg.showModal();
 };
@@ -671,9 +587,7 @@ $('#closeSettings').onclick=()=>dlg.close();
 $('#saveSettings').onclick=()=>{
   const s=state.settings;
   s.base=Math.max(0,parseInt($('#s_base').value,10)||0);
-  s.tol=Math.max(0,parseInt($('#s_tol').value,10)||0);
-  dlg.querySelectorAll('input[data-rate]').forEach(inp=>{s.rates[inp.dataset.rate]=Math.max(1,parseInt(inp.value,10)||1);});
-  dlg.querySelectorAll('input[data-dual]').forEach(inp=>{s.dualRates[inp.dataset.dual]=Math.max(1,parseInt(inp.value,10)||1);});
+  dlg.querySelectorAll('input[data-rate]').forEach(inp=>{const r=inp.dataset.rank;(s.rates[r]=s.rates[r]||{})[inp.dataset.rate]=Math.max(0,parseInt(inp.value,10)||0);});
   s.mode=dlg.querySelector('input[name=mode]:checked').value;
   dlg.close();renderAll();toast('設定已儲存');
 };
