@@ -260,6 +260,7 @@ const ITEMS=[
   {k:'manager',     label:'主管管理無過失',       kind:'flag', elig:p=>!!p.manager,       who:'主管'},
   {k:'snow',        label:'單板lv2 訓練獎金',     kind:'flag', elig:p=>!!p.snow,          who:'單板lv2'},
   {k:'ski',         label:'雙板lv2 訓練獎金',     kind:'flag', elig:p=>!!p.ski,           who:'雙板lv2'},
+  {k:'dual',        label:'單雙板雙證照加給',     kind:'flag', elig:p=>!!(p.snow&&p.ski), who:'單板＋雙板皆有'},
   {k:'mentor',      label:'資深教練帶新人無重大過失', kind:'flag', elig:p=>p.rank===SENIOR, who:'資深教練'},
   {k:'noComplaint', label:'無客人重大負評',       kind:'flag'},
   {k:'resort',      label:'雪場評級無重大過失',   kind:'flag'}
@@ -271,11 +272,11 @@ const RATE_RANKS=[SENIOR,CONTRACT];
 // 單價依階級設定：同階級同項目同金額。全部達成時，每人每月達成項目合計剛好等於每月獎金
 const DEFAULT_SETTINGS={base:29500,mode:'season',
   rates:{
-    [SENIOR]:  {manager:5000,snow:10000,ski:30000,mentor:5000,noComplaint:15500,resort:10000},
-    [CONTRACT]:{manager:5000,snow:5000, ski:5000, mentor:0,   noComplaint:20500,resort:10000}
+    [SENIOR]:  {manager:5000,snow:10000,ski:10000,dual:20000,mentor:5000,noComplaint:15500,resort:10000},
+    [CONTRACT]:{manager:5000,snow:5000, ski:5000, dual:0,    mentor:0,   noComplaint:20500,resort:10000}
   }};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
-const RULES_VER=7;
+const RULES_VER=8;
 // 取得某人某項目的單價（「其他」階級沿用合約教練）
 function rateOf(k,p,s){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};return +r[k]||0;}
 // 某人全部達成時的每月獎金
@@ -446,7 +447,7 @@ function renderDetail(){
         <label class="tog"><input type="checkbox" data-f="manager" ${p.manager?'checked':''}>主管</label>
         <label class="tog"><input type="checkbox" data-f="snow" ${p.snow?'checked':''}>單板lv2</label>
         <label class="tog"><input type="checkbox" data-f="ski" ${p.ski?'checked':''}>雙板lv2</label>
-        <span class="hint">「帶新人」只有資深教練適用；「無客人重大負評」「雪場評級」人人適用</span>
+        <span class="hint">單板與雙板都有時自動加上「雙證照加給」；「帶新人」只有資深教練適用；「無客人重大負評」「雪場評級」人人適用</span>
       </div>
     </div>
     <div class="section">
