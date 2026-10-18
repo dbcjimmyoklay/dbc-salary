@@ -280,11 +280,11 @@ const RATE_RANKS=[SENIOR,CONTRACT];
 // 底薪依月份：2027 年 1 月起調整為 30,900
 const DEFAULT_SETTINGS={bases:[29500,30900,30900,30900],mode:'season',
   rates:{
-    [SENIOR]:  {manager:5000,snow:10000,ski:10000,dualSnow:20000,dualSki:20000,mentor:4500,noComplaint:15000,resort:10000,grade:{'S':1500,'A+':1000,'A':500,'B':0}},
-    [CONTRACT]:{manager:5000,snow:5000, ski:5000, dualSnow:5000,dualSki:5000,mentor:0,   noComplaint:15000,resort:10000,grade:{'S':6000,'A+':5500,'A':5000,'B':0}}
+    [SENIOR]:  {manager:5000,snow:10000,ski:10000,dualSnow:20000,dualSki:20000,mentor:3450,noComplaint:15000,resort:10000,grade:{'S':1500,'A+':1000,'A':500,'B':0}},
+    [CONTRACT]:{manager:5000,snow:5000, ski:5000, dualSnow:5000,dualSki:5000,mentor:0,   noComplaint:15000,resort:10000,grade:{'S':4950,'A+':4450,'A':3950,'B':0}}
   }};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
-const RULES_VER=12;
+const RULES_VER=13;
 // 月度表現評等的三個等級
 const GRADES=['S','A+','A','B'];
 // 隨機模擬只用這三級（B 為 0，留給手動選擇），每月差額才會小
@@ -296,18 +296,15 @@ const isDual=p=>!!(p.snow&&p.ski);
 // 某月底薪，與該月比 12 月多出的金額
 function baseOf(s,i){const b=s.bases||[];return +(b[i]!=null?b[i]:b[0])||0;}
 function raiseOf(s,i){return Math.max(0,baseOf(s,i)-baseOf(s,0));}
-function rateOf(k,p,s,i=0){
-  if(k==='mentor'&&p.rank===SENIOR) return Math.max(0,baseRate(k,p,s)-raiseOf(s,i));
-  return baseRate(k,p,s);}
+// 項目金額四個月相同；12 月底薪較低的差額，由 1–3 月的金額一起補足
+function rateOf(k,p,s,i=0){return baseRate(k,p,s);}
 function baseRate(k,p,s){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};
   if(isDual(p)&&(k==='snow'||k==='ski')){const d=r[k==='snow'?'dualSnow':'dualSki']; if(d!=null) return +d||0;}
   return +r[k]||0;}
 // 某人全部達成時的每月獎金
 function fullMonthly(p,s,i=0){let F=0;for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=rateOf(t.k,p,s,i);return F;}
 // 某人某等級的評等金額
-function gradeAmt(p,s,g,i=0){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};const v=+((r.grade||{})[g])||0;
-  if(p.rank!==SENIOR&&g!=='B') return Math.max(0,v-raiseOf(s,i));
-  return v;}
+function gradeAmt(p,s,g,i=0){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};return +((r.grade||{})[g])||0;}
 // 四個月評等的所有組合中，加總剛好等於所需金額的組合
 function gradeCombos(p,s){
   const c=calc(p,s), need=c.targetVar-MONTHS.reduce((x,_,i)=>x+fullMonthly(p,s,i),0), out=[];
@@ -500,7 +497,7 @@ function renderDetail(){
       </div>
     </div>
     <div class="section">
-      <div class="section-title"><h3>應領總薪水的組成</h3><span class="eq">月薪 ${fmt(c.monthly)} × ${n} 個月 ＝ <b>${fmt(c.expected)}</b>　平均每月獎金 ＝ ${fmt(c.N)}　每月應領 ＝ ${fmt(c.AZ)}${raiseOf(s,1)?'　1月起底薪調為 '+fmt(baseOf(s,1))+'，差額 '+fmt(raiseOf(s,1))+' 由'+(p.rank===SENIOR?'「帶新人」':'「評等」')+'扣回':''}</span></div>
+      <div class="section-title"><h3>應領總薪水的組成</h3><span class="eq">月薪 ${fmt(c.monthly)} × ${n} 個月 ＝ <b>${fmt(c.expected)}</b>　平均每月獎金 ＝ ${fmt(c.N)}　每月應領 ＝ ${fmt(c.AZ)}${raiseOf(s,1)?'　12月底薪 '+fmt(baseOf(s,0))+'、1月起 '+fmt(baseOf(s,1))+'；項目金額每月相同，12月較少的部分由1–3月補足':''}</span></div>
       <div class="bar">${bar}</div>
       <div class="legend">${legend}</div>
     </div>
