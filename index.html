@@ -235,7 +235,10 @@ dialog::backdrop{background:rgba(10,14,20,.5)}
   <div class="dlg-head"><h2>試算設定</h2><button class="btn small" id="closeSettings">關閉</button></div>
   <div class="dlg-body">
     <div class="grid">
-      <div class="field"><label>每月底薪</label><input type="number" id="s_base" inputmode="numeric"></div>
+      <div class="field"><label>12月底薪</label><input type="number" id="s_base0" inputmode="numeric"></div>
+      <div class="field"><label>1月底薪</label><input type="number" id="s_base1" inputmode="numeric"></div>
+      <div class="field"><label>2月底薪</label><input type="number" id="s_base2" inputmode="numeric"></div>
+      <div class="field"><label>3月底薪</label><input type="number" id="s_base3" inputmode="numeric"></div>
     </div>
     <div id="rateGrid" class="rate-ranks"></div>
     <div>
@@ -274,13 +277,14 @@ const eligible=(t,p)=>!t.elig||t.elig(p);
 const CONTRACT='合約教練';
 const RATE_RANKS=[SENIOR,CONTRACT];
 // 單價依階級設定：同階級同項目同金額。全部達成時，每人每月達成項目合計剛好等於每月獎金
-const DEFAULT_SETTINGS={base:29500,mode:'season',
+// 底薪依月份：2027 年 1 月起調整為 30,900
+const DEFAULT_SETTINGS={bases:[29500,30900,30900,30900],mode:'season',
   rates:{
     [SENIOR]:  {manager:5000,snow:10000,ski:10000,dualSnow:20000,dualSki:20000,mentor:4500,noComplaint:15000,resort:10000,grade:{'S':1500,'A+':1000,'A':500,'B':0}},
     [CONTRACT]:{manager:5000,snow:5000, ski:5000, dualSnow:5000,dualSki:5000,mentor:0,   noComplaint:15000,resort:10000,grade:{'S':6000,'A+':5500,'A':5000,'B':0}}
   }};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
-const RULES_VER=11;
+const RULES_VER=12;
 // 月度表現評等的三個等級
 const GRADES=['S','A+','A','B'];
 // 隨機模擬只用這三級（B 為 0，留給手動選擇），每月差額才會小
@@ -289,18 +293,26 @@ const MID=()=>['A+','A+','A+','A+'];
 // 取得某人某項目的單價（「其他」階級沿用合約教練）
 // 單板與雙板證照都有的人，訓練獎金改用較高的 dualSnow / dualSki
 const isDual=p=>!!(p.snow&&p.ski);
-function rateOf(k,p,s){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};
+// 某月底薪，與該月比 12 月多出的金額
+function baseOf(s,i){const b=s.bases||[];return +(b[i]!=null?b[i]:b[0])||0;}
+function raiseOf(s,i){return Math.max(0,baseOf(s,i)-baseOf(s,0));}
+function rateOf(k,p,s,i=0){
+  if(k==='mentor'&&p.rank===SENIOR) return Math.max(0,baseRate(k,p,s)-raiseOf(s,i));
+  return baseRate(k,p,s);}
+function baseRate(k,p,s){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};
   if(isDual(p)&&(k==='snow'||k==='ski')){const d=r[k==='snow'?'dualSnow':'dualSki']; if(d!=null) return +d||0;}
   return +r[k]||0;}
 // 某人全部達成時的每月獎金
-function fullMonthly(p,s){let F=0;for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=rateOf(t.k,p,s);return F;}
+function fullMonthly(p,s,i=0){let F=0;for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=rateOf(t.k,p,s,i);return F;}
 // 某人某等級的評等金額
-function gradeAmt(p,s,g){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};return +((r.grade||{})[g])||0;}
+function gradeAmt(p,s,g,i=0){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};const v=+((r.grade||{})[g])||0;
+  if(p.rank!==SENIOR&&g!=='B') return Math.max(0,v-raiseOf(s,i));
+  return v;}
 // 四個月評等的所有組合中，加總剛好等於所需金額的組合
 function gradeCombos(p,s){
-  const c=calc(p,s), need=c.targetVar-MONTHS.length*fullMonthly(p,s), out=[];
+  const c=calc(p,s), need=c.targetVar-MONTHS.reduce((x,_,i)=>x+fullMonthly(p,s,i),0), out=[];
   for(const a of SIM_GRADES)for(const b of SIM_GRADES)for(const d of SIM_GRADES)for(const e of SIM_GRADES){
-    const g=[a,b,d,e]; if(g.reduce((x,k)=>x+gradeAmt(p,s,k),0)===need) out.push(g);
+    const g=[a,b,d,e]; if(g.reduce((x,k,i)=>x+gradeAmt(p,s,k,i),0)===need) out.push(g);
   }
   return {need,list:out};
 }
@@ -335,6 +347,7 @@ function load(){
       if(s.rulesVer!==RULES_VER){
         s.settings.rates=JSON.parse(JSON.stringify(DEFAULT_SETTINGS.rates));
         delete s.settings.dualRates; delete s.settings.tol;
+        s.settings.bases=DEFAULT_SETTINGS.bases.slice(); delete s.settings.base;
         for(const p of s.people) delete p.counts.dual;
         for(const p of s.people) p.counts.grade=MID();
         for(const p of s.people){delete p.counts.review;delete p.counts.nominate;setFlags(p);}
@@ -355,14 +368,14 @@ function calc(p,s){
   const n=MONTHS.length;
   const monthly=(+p.salary||0)+(+p.allowance||0);      // F 月薪
   const expected=monthly*n;                             // H 應領總薪水
-  const baseTotal=s.base*n;                             // I 總底薪
+  const baseTotal=MONTHS.reduce((x,_,i)=>x+baseOf(s,i),0); // I 總底薪（依月份加總）
   const retain=+p.retain||0;                            // K 留任加給(總)
   const N=(expected-baseTotal-retain)/n;                // L 每月獎金
-  const AZ=N+s.base;                                    // CH 每月應領
+  const AZ=(expected-retain)/n;                         // CH 每月應領（底薪＋獎金的目標，每月相同）
   const months=MONTHS.map((_,i)=>{
     const subs={}; let v=0;
-    for(const t of ITEMS){subs[t.k]=t.kind==='grade'?gradeAmt(p,s,(p.counts.grade||[])[i]):eligible(t,p)?(+p.counts[t.k][i]||0)*rateOf(t.k,p,s):0; v+=subs[t.k];}
-    const actual=s.base+v;                              // CI 當月實領 ＝ 底薪 ＋ 當月全部獎金小計
+    for(const t of ITEMS){subs[t.k]=t.kind==='grade'?gradeAmt(p,s,(p.counts.grade||[])[i],i):eligible(t,p)?(+p.counts[t.k][i]||0)*rateOf(t.k,p,s,i):0; v+=subs[t.k];}
+    const actual=baseOf(s,i)+v;                         // CI 當月實領 ＝ 當月底薪 ＋ 當月全部獎金小計
     return {subs,variable:v,actual,diff:actual-AZ};     // CJ +/-
   });
   const sumVar=months.reduce((a,m)=>a+m.variable,0);
@@ -424,7 +437,7 @@ function renderDetail(){
   const p=person(); const s=state.settings; const el=$('#detail');
   if(!p){el.innerHTML='<div class="panel"><div class="empty">尚無人員，請先新增。</div></div>';return;}
   const c=calc(p,s); const n=MONTHS.length;
-  const segs=[['seg-base','底薪 × '+n,c.baseTotal],['seg-retain','留任加給',c.retain],['seg-bonus','每月獎金 × '+n,c.N*n]];
+  const segs=[['seg-base','底薪合計',c.baseTotal],['seg-retain','留任加給',c.retain],['seg-bonus','每月獎金 × '+n,c.N*n]];
   const bar=segs.map(([cl,,v])=>`<span style="flex:${Math.max(0,v)};background:var(--${cl})" title="${fmt(v)}"></span>`).join('');
   const legend=segs.map(([cl,l,v])=>`<div class="it"><span><i style="background:var(--${cl})"></i>${l}</span><b>${fmt(v)}</b></div>`).join('');
   const eligItems=ITEMS.filter(t=>eligible(t,p));
@@ -443,16 +456,16 @@ function renderDetail(){
       </div>`).join('');
     const flagRows=flags.map(t=>`
       <div class="mrow flag">
-        <div class="t">${t.label}<small>達成 ${fmt(rateOf(t.k,p,s))}${isDual(p)&&(t.k==='snow'||t.k==='ski')?'（單雙板皆有）':''}</small></div>
+        <div class="t">${t.label}<small>達成 ${fmt(rateOf(t.k,p,s,i))}${isDual(p)&&(t.k==='snow'||t.k==='ski')?'（單雙板皆有）':''}</small></div>
         <button type="button" class="switch" role="switch" aria-checked="${(p.counts[t.k][i]||0)>0}" data-flag="${t.k}" data-i="${i}" aria-label="${m} ${t.label}"></button>
       </div>`).join('');
     return `<div class="mcard">
-      <div class="mcard-head"><b>${m}</b><span>底薪 ${fmt(s.base)}</span></div>
+      <div class="mcard-head"><b>${m}</b><span>底薪 ${fmt(baseOf(s,i))}</span></div>
       ${countRows}
       ${flagRows}
       <div class="mrow">
         <div class="t">月度表現評等<small data-gsub="${i}">${fmt(mc.subs.grade)}</small></div>
-        <div class="seg" role="group" aria-label="${m} 月度表現評等">${GRADES.map(g=>`<button type="button" data-grade="${g}" data-i="${i}" aria-pressed="${(p.counts.grade||[])[i]===g}" title="${fmt(gradeAmt(p,s,g))}">${g}</button>`).join('')}</div>
+        <div class="seg" role="group" aria-label="${m} 月度表現評等">${GRADES.map(g=>`<button type="button" data-grade="${g}" data-i="${i}" aria-pressed="${(p.counts.grade||[])[i]===g}" title="${fmt(gradeAmt(p,s,g,i))}">${g}</button>`).join('')}</div>
       </div>
       <div class="mfoot">
         <div><span class="k">當月獎金</span><span data-mvar="${i}">${fmt(mc.variable)}</span></div>
@@ -487,12 +500,12 @@ function renderDetail(){
       </div>
     </div>
     <div class="section">
-      <div class="section-title"><h3>應領總薪水的組成</h3><span class="eq">月薪 ${fmt(c.monthly)} × ${n} 個月 ＝ <b>${fmt(c.expected)}</b>　每月獎金 ＝ ${fmt(c.N)}　每月應領 ＝ ${fmt(c.AZ)}</span></div>
+      <div class="section-title"><h3>應領總薪水的組成</h3><span class="eq">月薪 ${fmt(c.monthly)} × ${n} 個月 ＝ <b>${fmt(c.expected)}</b>　平均每月獎金 ＝ ${fmt(c.N)}　每月應領 ＝ ${fmt(c.AZ)}${raiseOf(s,1)?'　1月起底薪調為 '+fmt(baseOf(s,1))+'，差額 '+fmt(raiseOf(s,1))+' 由'+(p.rank===SENIOR?'「帶新人」':'「評等」')+'扣回':''}</span></div>
       <div class="bar">${bar}</div>
       <div class="legend">${legend}</div>
     </div>
     <div class="section">
-      <div class="section-title"><h3>每月實際紀錄</h3><span class="eq">達成項目每月 <b>${fmt(fullMonthly(p,s))}</b>，四個月評等需合計 <b>${fmt(gradeCombos(p,s).need)}</b>${gradeCombos(p,s).list.length?'　S 與 A 次數相同即相符':'　<span class="neg">無可行組合</span>'}</span></div>
+      <div class="section-title"><h3>每月實際紀錄</h3><span class="eq">達成項目每月 <b>${[...new Set(MONTHS.map((_,i)=>fullMonthly(p,s,i)))].map(fmt).join(' → ')}</b>，四個月評等需合計 <b>${fmt(gradeCombos(p,s).need)}</b>${gradeCombos(p,s).list.length?'　S 與 A 次數相同即相符':'　<span class="neg">無可行組合</span>'}</span></div>
       <div class="months">${monthCards}</div>
     </div>
     <div class="section">
@@ -625,7 +638,7 @@ $('#copyAll').onclick=async()=>{
 const dlg=$('#settings');
 $('#openSettings').onclick=()=>{
   const s=state.settings;
-  $('#s_base').value=s.base;
+  for(let i=0;i<4;i++) $('#s_base'+i).value=baseOf(s,i);
   $('#rateGrid').innerHTML=RATE_RANKS.map(r=>`<div><h4>${r} · 每月達成單價</h4><div class="grid">${ITEMS.filter(t=>t.kind==='flag'&&!(r===CONTRACT&&t.k==='mentor')).map(t=>`<div class="field"><label>${t.label}${t.who?'（'+t.who+'）':''}</label><input type="number" inputmode="numeric" data-rank="${r}" data-rate="${t.k}" value="${(s.rates[r]||{})[t.k]||0}"></div>`).join('')}${[['dualSnow','單板lv2 訓練獎金（單雙板皆有）'],['dualSki','雙板lv2 訓練獎金（單雙板皆有）']].map(([k,l])=>`<div class="field"><label>${l}</label><input type="number" inputmode="numeric" data-rank="${r}" data-rate="${k}" value="${(s.rates[r]||{})[k]||0}"></div>`).join('')}${GRADES.map(g=>`<div class="field"><label>月度表現評等 ${g}</label><input type="number" inputmode="numeric" data-rank="${r}" data-grade-rate="${g}" value="${((s.rates[r]||{}).grade||{})[g]||0}"></div>`).join('')}</div></div>`).join('');
   dlg.querySelector(`input[name=mode][value=${s.mode}]`).checked=true;
   dlg.showModal();
@@ -633,7 +646,7 @@ $('#openSettings').onclick=()=>{
 $('#closeSettings').onclick=()=>dlg.close();
 $('#saveSettings').onclick=()=>{
   const s=state.settings;
-  s.base=Math.max(0,parseInt($('#s_base').value,10)||0);
+  s.bases=[0,1,2,3].map(i=>Math.max(0,parseInt($('#s_base'+i).value,10)||0));
   dlg.querySelectorAll('input[data-rate]').forEach(inp=>{const r=inp.dataset.rank;(s.rates[r]=s.rates[r]||{})[inp.dataset.rate]=Math.max(0,parseInt(inp.value,10)||0);});
   dlg.querySelectorAll('input[data-grade-rate]').forEach(inp=>{const r=inp.dataset.rank;s.rates[r]=s.rates[r]||{};(s.rates[r].grade=s.rates[r].grade||{})[inp.dataset.gradeRate]=Math.max(0,parseInt(inp.value,10)||0);});
   s.mode=dlg.querySelector('input[name=mode]:checked').value;
