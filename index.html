@@ -264,7 +264,6 @@ const ITEMS=[
   {k:'manager',     label:'主管管理無過失',       kind:'flag', elig:p=>!!p.manager,       who:'主管'},
   {k:'snow',        label:'單板lv2 訓練獎金',     kind:'flag', elig:p=>!!p.snow,          who:'單板lv2'},
   {k:'ski',         label:'雙板lv2 訓練獎金',     kind:'flag', elig:p=>!!p.ski,           who:'雙板lv2'},
-  {k:'dual',        label:'單雙板雙證照加給',     kind:'flag', elig:p=>!!(p.snow&&p.ski), who:'單板＋雙板皆有'},
   {k:'mentor',      label:'資深教練帶新人無重大過失', kind:'flag', elig:p=>p.rank===SENIOR, who:'資深教練'},
   {k:'noComplaint', label:'無客人重大負評',       kind:'flag'},
   {k:'resort',      label:'雪場評級無重大過失',   kind:'flag'},
@@ -277,16 +276,20 @@ const RATE_RANKS=[SENIOR,CONTRACT];
 // 單價依階級設定：同階級同項目同金額。全部達成時，每人每月達成項目合計剛好等於每月獎金
 const DEFAULT_SETTINGS={base:29500,mode:'season',
   rates:{
-    [SENIOR]:  {manager:5000,snow:10000,ski:10000,dual:20000,mentor:4500,noComplaint:15000,resort:10000,grade:{'S':1500,'A+':1000,'A':500}},
-    [CONTRACT]:{manager:5000,snow:5000, ski:5000, dual:0,    mentor:0,   noComplaint:15000,resort:10000,grade:{'S':6000,'A+':5500,'A':5000}}
+    [SENIOR]:  {manager:5000,snow:10000,ski:10000,dualSnow:20000,dualSki:20000,mentor:4500,noComplaint:15000,resort:10000,grade:{'S':1500,'A+':1000,'A':500}},
+    [CONTRACT]:{manager:5000,snow:5000, ski:5000, dualSnow:5000,dualSki:5000,mentor:0,   noComplaint:15000,resort:10000,grade:{'S':6000,'A+':5500,'A':5000}}
   }};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
-const RULES_VER=9;
+const RULES_VER=10;
 // 月度表現評等的三個等級
 const GRADES=['S','A+','A'];
 const MID=()=>['A+','A+','A+','A+'];
 // 取得某人某項目的單價（「其他」階級沿用合約教練）
-function rateOf(k,p,s){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};return +r[k]||0;}
+// 單板與雙板證照都有的人，訓練獎金改用較高的 dualSnow / dualSki
+const isDual=p=>!!(p.snow&&p.ski);
+function rateOf(k,p,s){const r=s.rates[p.rank]||s.rates[CONTRACT]||{};
+  if(isDual(p)&&(k==='snow'||k==='ski')){const d=r[k==='snow'?'dualSnow':'dualSki']; if(d!=null) return +d||0;}
+  return +r[k]||0;}
 // 某人全部達成時的每月獎金
 function fullMonthly(p,s){let F=0;for(const t of ITEMS) if(t.kind==='flag'&&eligible(t,p)) F+=rateOf(t.k,p,s);return F;}
 // 某人某等級的評等金額
@@ -330,6 +333,7 @@ function load(){
       if(s.rulesVer!==RULES_VER){
         s.settings.rates=JSON.parse(JSON.stringify(DEFAULT_SETTINGS.rates));
         delete s.settings.dualRates; delete s.settings.tol;
+        for(const p of s.people) delete p.counts.dual;
         for(const p of s.people) p.counts.grade=MID();
         for(const p of s.people){delete p.counts.review;delete p.counts.nominate;setFlags(p);}
         s.rulesVer=RULES_VER;
@@ -437,7 +441,7 @@ function renderDetail(){
       </div>`).join('');
     const flagRows=flags.map(t=>`
       <div class="mrow flag">
-        <div class="t">${t.label}<small>達成 ${fmt(rateOf(t.k,p,s))}</small></div>
+        <div class="t">${t.label}<small>達成 ${fmt(rateOf(t.k,p,s))}${isDual(p)&&(t.k==='snow'||t.k==='ski')?'（單雙板皆有）':''}</small></div>
         <button type="button" class="switch" role="switch" aria-checked="${(p.counts[t.k][i]||0)>0}" data-flag="${t.k}" data-i="${i}" aria-label="${m} ${t.label}"></button>
       </div>`).join('');
     return `<div class="mcard">
@@ -477,7 +481,7 @@ function renderDetail(){
         <label class="tog"><input type="checkbox" data-f="manager" ${p.manager?'checked':''}>主管</label>
         <label class="tog"><input type="checkbox" data-f="snow" ${p.snow?'checked':''}>單板lv2</label>
         <label class="tog"><input type="checkbox" data-f="ski" ${p.ski?'checked':''}>雙板lv2</label>
-        <span class="hint">單板與雙板都有時自動加上「雙證照加給」；「帶新人」只有資深教練適用；「月度表現評等」每人每月選一級；「無客人重大負評」「雪場評級」人人適用</span>
+        <span class="hint">單板與雙板都有時，兩項訓練獎金自動改用較高單價；「帶新人」只有資深教練適用；「月度表現評等」每人每月選一級；「無客人重大負評」「雪場評級」人人適用</span>
       </div>
     </div>
     <div class="section">
@@ -620,7 +624,7 @@ const dlg=$('#settings');
 $('#openSettings').onclick=()=>{
   const s=state.settings;
   $('#s_base').value=s.base;
-  $('#rateGrid').innerHTML=RATE_RANKS.map(r=>`<div><h4>${r} · 每月達成單價</h4><div class="grid">${ITEMS.filter(t=>t.kind==='flag'&&!(r===CONTRACT&&t.k==='mentor')).map(t=>`<div class="field"><label>${t.label}${t.who?'（'+t.who+'）':''}</label><input type="number" inputmode="numeric" data-rank="${r}" data-rate="${t.k}" value="${(s.rates[r]||{})[t.k]||0}"></div>`).join('')}${GRADES.map(g=>`<div class="field"><label>月度表現評等 ${g}</label><input type="number" inputmode="numeric" data-rank="${r}" data-grade-rate="${g}" value="${((s.rates[r]||{}).grade||{})[g]||0}"></div>`).join('')}</div></div>`).join('');
+  $('#rateGrid').innerHTML=RATE_RANKS.map(r=>`<div><h4>${r} · 每月達成單價</h4><div class="grid">${ITEMS.filter(t=>t.kind==='flag'&&!(r===CONTRACT&&t.k==='mentor')).map(t=>`<div class="field"><label>${t.label}${t.who?'（'+t.who+'）':''}</label><input type="number" inputmode="numeric" data-rank="${r}" data-rate="${t.k}" value="${(s.rates[r]||{})[t.k]||0}"></div>`).join('')}${[['dualSnow','單板lv2 訓練獎金（單雙板皆有）'],['dualSki','雙板lv2 訓練獎金（單雙板皆有）']].map(([k,l])=>`<div class="field"><label>${l}</label><input type="number" inputmode="numeric" data-rank="${r}" data-rate="${k}" value="${(s.rates[r]||{})[k]||0}"></div>`).join('')}${GRADES.map(g=>`<div class="field"><label>月度表現評等 ${g}</label><input type="number" inputmode="numeric" data-rank="${r}" data-grade-rate="${g}" value="${((s.rates[r]||{}).grade||{})[g]||0}"></div>`).join('')}</div></div>`).join('');
   dlg.querySelector(`input[name=mode][value=${s.mode}]`).checked=true;
   dlg.showModal();
 };
