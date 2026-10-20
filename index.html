@@ -139,6 +139,9 @@ h1,h2,h3{margin:0;text-wrap:balance;line-height:1.25}
 .seg button{border:0;background:var(--surface);padding:5px 10px;font-size:13px;font-weight:600;color:var(--ink-2);min-width:38px}
 .seg button+button{border-left:1px solid var(--line-strong)}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.mrow.sales{background:var(--warn-soft)}
+.sales-in{width:110px;padding:6px 8px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);text-align:right}
+.extra{color:var(--warn)}
 .divider{padding:6px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);letter-spacing:.04em;background:var(--surface-2)}
 .mfoot{margin-top:auto;padding:10px 12px;border-top:1px solid var(--line);background:var(--surface-2);display:grid;gap:4px;font-size:13px}
 .mfoot div{display:flex;justify-content:space-between;align-items:center}
@@ -285,6 +288,8 @@ const DEFAULT_SETTINGS={bases:[30900,30900,30900,30900],mode:'season',
   }};
 // 規則版本：變更時，舊瀏覽器存的單價會更新為新預設，並把適用的達成項目設為達成
 const RULES_VER=14;
+// 業績獎金：公司不定期公告的懸賞獎金，額外發給，不計入實領＝應領的比對
+const salesOf=(p,i)=>Math.max(0,+((p.counts.sales||[])[i])||0);
 // 月度表現評等的三個等級
 const GRADES=['S','A+','A','B'];
 // 隨機模擬只用這三級（B 為 0，留給手動選擇），每月差額才會小
@@ -318,6 +323,7 @@ function P(id,rank,name,salary,allowance,note,retain,flags,counts){
   const c={}; for(const t of ITEMS) c[t.k]=Z();
   if(counts) Object.assign(c,counts);
   c.grade=MID();
+  c.sales=Z();
   return {id,rank,name,salary,allowance,note,retain,manager:!!flags.manager,snow:!!flags.snow,ski:!!flags.ski,counts:c};
 }
 const STD={noComplaint:ONE(),resort:ONE()};
@@ -373,13 +379,15 @@ function calc(p,s){
     const subs={}; let v=0;
     for(const t of ITEMS){subs[t.k]=t.kind==='grade'?gradeAmt(p,s,(p.counts.grade||[])[i],i):eligible(t,p)?(+p.counts[t.k][i]||0)*rateOf(t.k,p,s,i):0; v+=subs[t.k];}
     const actual=baseOf(s,i)+v;                         // CI 當月實領 ＝ 當月底薪 ＋ 當月全部獎金小計
-    return {subs,variable:v,actual,diff:actual-AZ};     // CJ +/-
+    const sales=salesOf(p,i);
+    return {subs,variable:v,actual,diff:actual-AZ,sales,actualAll:actual+sales};     // CJ +/-（不含業績獎金）
   });
   const sumVar=months.reduce((a,m)=>a+m.variable,0);
   const sumActual=months.reduce((a,m)=>a+m.actual,0);   // CQ
+  const salesTotal=months.reduce((a,m)=>a+m.sales,0);
   const totalActual=s.mode==='sheet'?sumActual+baseTotal:sumActual+retain;   // CS
   const targetVar=s.mode==='sheet'?expected-2*baseTotal:expected-baseTotal-retain;
-  return {monthly,expected,baseTotal,retain,N,AZ,months,sumVar,sumActual,totalActual,gap:totalActual-expected,targetVar};
+  return {monthly,expected,baseTotal,retain,N,AZ,months,sumVar,sumActual,totalActual,gap:totalActual-expected,targetVar,salesTotal,totalWithSales:totalActual+salesTotal};
 }
 
 /* ---------- 全部達成 ---------- */
@@ -464,11 +472,17 @@ function renderDetail(){
         <div class="t">月度表現評等<small data-gsub="${i}">${fmt(mc.subs.grade)}</small></div>
         <div class="seg" role="group" aria-label="${m} 月度表現評等">${GRADES.map(g=>`<button type="button" data-grade="${g}" data-i="${i}" aria-pressed="${(p.counts.grade||[])[i]===g}" title="${fmt(gradeAmt(p,s,g,i))}">${g}</button>`).join('')}</div>
       </div>
+      <div class="mrow sales">
+        <div class="t">業績獎金<small>依公司公告，額外發給</small></div>
+        <input class="sales-in" type="number" min="0" step="100" inputmode="numeric" value="${mc.sales||''}" placeholder="0" data-sales="${i}" aria-label="${m} 業績獎金">
+      </div>
       <div class="mfoot">
         <div><span class="k">當月獎金</span><span data-mvar="${i}">${fmt(mc.variable)}</span></div>
         <div><span class="k">當月實領</span><span class="big" data-mact="${i}">${fmt(mc.actual)}</span></div>
         <div><span class="k">每月應領</span><span>${fmt(c.AZ)}</span></div>
         <div><span class="k">差額</span><span data-mdiff="${i}">${gapPill(mc.diff)}</span></div>
+        <div><span class="k">＋業績獎金</span><span class="extra" data-msales="${i}">${fmt(mc.sales)}</span></div>
+        <div><span class="k">當月合計入帳</span><span data-mall="${i}">${fmt(mc.actualAll)}</span></div>
       </div>
     </div>`;
   }).join('');
@@ -515,6 +529,8 @@ function renderDetail(){
             :`<div><span class="k">留任加給（季初一次性）</span><span>${fmt(c.retain)}</span></div>`}
           <div><span class="k sum">實領總薪水</span><span class="sum" data-totact>${fmt(c.totalActual)}</span></div>
           <div><span class="k sum">應領總薪水</span><span class="sum">${fmt(c.expected)}</span></div>
+          <div><span class="k">＋業績獎金（額外，不列入比對）</span><span class="extra" data-salestot>${fmt(c.salesTotal)}</span></div>
+          <div><span class="k sum">本季合計入帳</span><span class="sum" data-totall>${fmt(c.totalWithSales)}</span></div>
         </div>
         <div class="verdict ${c.gap===0||isNear(p,c)?'ok':c.gap>0?'warn':'bad'}" data-verdict>
           <div class="lbl">實領 − 應領</div>
@@ -535,7 +551,11 @@ function refreshNumbers(){
     el.querySelector(`[data-mvar="${i}"]`).textContent=fmt(mc.variable);
     el.querySelector(`[data-mact="${i}"]`).textContent=fmt(mc.actual);
     el.querySelector(`[data-mdiff="${i}"]`).innerHTML=gapPill(mc.diff);
+    el.querySelector(`[data-msales="${i}"]`).textContent=fmt(mc.sales);
+    el.querySelector(`[data-mall="${i}"]`).textContent=fmt(mc.actualAll);
   });
+  el.querySelector('[data-salestot]').textContent=fmt(c.salesTotal);
+  el.querySelector('[data-totall]').textContent=fmt(c.totalWithSales);
   el.querySelector('[data-sumact]').textContent=fmt(c.sumActual);
   el.querySelector('[data-totact]').textContent=fmt(c.totalActual);
   const v=el.querySelector('[data-verdict]');
@@ -553,6 +573,13 @@ function bindDetail(el,p){
       const k=b.dataset.k,i=+b.dataset.i;
       p.counts[k][i]=Math.max(0,(p.counts[k][i]||0)+ +b.dataset.step);
       el.querySelector(`input[data-k="${k}"][data-i="${i}"]`).value=p.counts[k][i];
+      refreshNumbers();
+    });
+  });
+  el.querySelectorAll('input[data-sales]').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      if(!Array.isArray(p.counts.sales)) p.counts.sales=Z();
+      p.counts.sales[+inp.dataset.sales]=Math.max(0,parseInt(inp.value,10)||0);
       refreshNumbers();
     });
   });
@@ -616,14 +643,16 @@ $('#copyAll').onclick=async()=>{
   const head=['編號','階級','人員','薪水','加給','月薪','備註','應領總薪水','總底薪','總額-底薪','留任加給(總)','每月獎金','每月應領'];
   for(const t of ITEMS) for(const m of MONTHS) head.push(`${t.label} ${m}`);
   for(const m of MONTHS){head.push(`${m}實領`);head.push(`${m} +/-`);}
-  head.push('四個月實領合計',s.mode==='sheet'?'總實領底薪':'留任加給','實領總薪水','應領總薪水','差額');
+  for(const m of MONTHS) head.push(`業績獎金 ${m}`);
+  head.push('四個月實領合計',s.mode==='sheet'?'總實領底薪':'留任加給','實領總薪水','應領總薪水','差額','業績獎金合計','本季合計入帳');
   const lines=[head.join('\t')];
   state.people.forEach((p,i)=>{
     const c=calc(p,s);
     const r=[i+1,p.rank,p.name,p.salary,p.allowance,c.monthly,p.note,c.expected,c.baseTotal,c.expected-c.baseTotal,c.retain,c.N,c.AZ];
     for(const t of ITEMS) for(let m=0;m<MONTHS.length;m++) r.push(eligible(t,p)?(p.counts[t.k][m]||0):0);
     c.months.forEach(m=>{r.push(m.actual);r.push(m.diff);});
-    r.push(c.sumActual,s.mode==='sheet'?c.baseTotal:c.retain,c.totalActual,c.expected,c.gap);
+    c.months.forEach(m=>r.push(m.sales));
+    r.push(c.sumActual,s.mode==='sheet'?c.baseTotal:c.retain,c.totalActual,c.expected,c.gap,c.salesTotal,c.totalWithSales);
     lines.push(r.join('\t'));
   });
   const text=lines.join('\n');
